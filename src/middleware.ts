@@ -1,5 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import {
+  PUBLIC_PATHS,
+  RESTRICTED_ROUTES,
+  ROLE_HOME,
+  type RoleCode,
+} from '@/shared/constants/roleAccess';
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -25,23 +31,37 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Baris ini WAJIB ada — memicu refresh token jika sudah kedaluwarsa.
-  // Jangan hapus meski terlihat seperti variable yang tidak dipakai.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const pathname = request.nextUrl.pathname;
+  const isPublicPath = PUBLIC_PATHS.includes(pathname);
+
+  // Belum login, mencoba akses halaman yang butuh login -> lempar ke Login
+  if (!user && !isPublicPath && pathname !== '/') {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  if (user) {
+    const roleCode = user.app_metadata?.role_code as RoleCode | undefined;
+    const home = roleCode ? ROLE_HOME[roleCode] : '/dashboard';
+
+    // Sudah login tapi membuka halaman Login -> lempar ke halaman utamanya
+    if (isPublicPath) {
+      return NextResponse.redirect(new URL(home, request.url));
+    }
+
+    // Sudah login, cek apakah role-nya berhak akses path ini
+    const allowedRoles = RESTRICTED_ROUTES[pathname];
+    if (allowedRoles && (!roleCode || !allowedRoles.includes(roleCode))) {
+      return NextResponse.redirect(new URL(home, request.url));
+    }
+  }
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Jalankan middleware di semua route KECUALI:
-     * - file statis Next.js internal (_next/static, _next/image)
-     * - favicon.ico
-     * - file dengan ekstensi gambar umum
-     * Ini mencegah middleware jalan sia-sia di request aset statis,
-     * yang tidak butuh pengecekan session sama sekali.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

@@ -4,14 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, ShoppingCart, Wrench, Truck, Menu } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
+import { RESTRICTED_ROUTES, type RoleCode } from '@/shared/constants/roleAccess';
 
-/**
- * Bottom navigation — hasil konsolidasi 10 halaman awal menjadi
- * 5 menu utama (lihat dokumen Wireframe & UX sebelumnya):
- * Detail Barang, Hutang Supplier, Stock Opname, Laporan, Pengaturan
- * semuanya diakses lewat "Lainnya", bukan jadi tombol nav sendiri.
- */
-const navItems = [
+const ALL_NAV_ITEMS = [
   { href: '/dashboard', label: 'Beranda', icon: LayoutDashboard },
   { href: '/pos', label: 'Kasir', icon: ShoppingCart },
   { href: '/service', label: 'Servis', icon: Wrench },
@@ -19,13 +14,27 @@ const navItems = [
   { href: '/more', label: 'Lainnya', icon: Menu },
 ] as const;
 
-export function BottomNav() {
+interface BottomNavProps {
+  roleCode: RoleCode;
+}
+
+export function BottomNav({ roleCode }: BottomNavProps) {
   const pathname = usePathname();
+
+  // Tampilkan tombol hanya jika path tsb tidak dibatasi (netral untuk
+  // semua role) ATAU role pengguna termasuk yang diizinkan.
+  // Aturan sama persis dengan yang dipakai Middleware (RESTRICTED_ROUTES) —
+  // sengaja diimpor dari sumber yang sama supaya tidak ada 2 aturan
+  // yang bisa saling tidak sinkron.
+  const visibleItems = ALL_NAV_ITEMS.filter((item) => {
+    const allowedRoles = RESTRICTED_ROUTES[item.href];
+    return !allowedRoles || allowedRoles.includes(roleCode);
+  });
 
   return (
     <nav className="fixed right-0 bottom-0 left-0 z-50 border-t border-neutral-200 bg-white">
       <div className="mx-auto flex max-w-md items-center justify-around">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {visibleItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname.startsWith(href);
 
           return (

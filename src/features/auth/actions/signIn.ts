@@ -5,6 +5,7 @@ import { createClient } from '@/shared/lib/supabase/server';
 import { loginSchema } from '../validation/loginSchema';
 import { phoneToInternalEmail } from '../lib/mapPhoneToEmail';
 import { padPin } from '../lib/padPin';
+import { checkLoginLockout, recordFailedLogin, resetLoginAttempts } from '../api/authRpc';
 
 type SignInResult = { error: string };
 
@@ -22,21 +23,18 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
   const supabase = await createClient();
 
   // 1. Cek lockout SEBELUM mencoba autentikasi
-  const { data: lockoutRows, error: lockoutError } = await supabase.rpc(
-    'check_login_lockout',
-    { p_phone_number: phoneNumber }
-  );
+  const lockoutResult = await checkLoginLockout(supabase, phoneNumber);
 
-  if (lockoutError) {
-    return { error: 'Terjadi kesalahan sistem, coba lagi.' };
+  if (!lockoutResult.success) {
+    return { error: lockoutResult.error.message };
   }
 
-  const lockout = lockoutRows?.[0];
-  if (lockout?.is_locked) {
-    const until = new Date(lockout.locked_until as string).toLocaleTimeString(
-      'id-ID',
-      { hour: '2-digit', minute: '2-digit' }
-    );
+  const lockout = lockoutResult.data[0];
+  if (lockout?.is_locked && lockout.locked_until) {
+    const until = new Date(lockout.locked_until).toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     return { error: `Akun terkunci sementara. Coba lagi setelah pukul ${until}.` };
   }
 
@@ -49,17 +47,15 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
 
   if (error || !data.session) {
     // Sengaja pesan generik — tidak membocorkan mana yang salah (HP/PIN)
-    await supabase.rpc('record_failed_login', { p_phone_number: phoneNumber });
+    await recordFailedLogin(supabase, phoneNumber);
     return { error: 'Nomor HP atau PIN salah.' };
   }
 
   // 3. Sukses — reset counter lockout
-  await supabase.rpc('reset_login_attempts', { p_phone_number: phoneNumber });
+  await resetLoginAttempts(supabase, phoneNumber);
 
   // 4. Redirect sesuai role (dibaca dari app_metadata JWT)
-  const roleCode = data.session.user.app_metadata?.role_code as
-    | string
-    | undefined;
+  const roleCode = data.session.user.app_metadata?.role_code as string | undefined;
 
   if (roleCode === 'kasir') redirect('/pos');
   if (roleCode === 'mekanik') redirect('/service');
