@@ -1,26 +1,87 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* ==========================================================
+     WARNA — Bahasa visual utama aplikasi (hijau/kuning/merah)
+     Dipakai konsisten di seluruh 12 modul: Dashboard, POS,
+     Servis, Inventory, dll — JANGAN hardcode hex color di
+     komponen manapun, selalu pakai token ini.
+     ========================================================== */
+
+  /* Warna aksen utama — tombol primary, link aktif */
+  --color-accent-50: #eff6ff;
+  --color-accent-100: #dbeafe;
+  --color-accent-500: #3b82f6;
+  --color-accent-600: #2563eb;
+  --color-accent-700: #1d4ed8;
+
+  /* Sukses — stok aman, lunas, transaksi berhasil */
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+
+  /* Peringatan — stok menipis, hutang mendekati jatuh tempo */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+
+  /* Urgent/Bahaya — stok habis, hutang jatuh tempo, error */
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  /* Netral — teks, border, background */
+  --color-neutral-50: #f9fafb;
+  --color-neutral-100: #f3f4f6;
+  --color-neutral-200: #e5e7eb;
+  --color-neutral-300: #d1d5db;
+  --color-neutral-400: #9ca3af;
+  --color-neutral-500: #6b7280;
+  --color-neutral-600: #4b5563;
+  --color-neutral-700: #374151;
+  --color-neutral-800: #1f2937;
+  --color-neutral-900: #111827;
+
+  /* ==========================================================
+     TIPOGRAFI — Ukuran font lebih besar dari default,
+     sesuai prinsip aksesibilitas untuk pengguna usia lebih
+     tua (Owner/Admin) yang sudah kita sepakati di UX.
+     ========================================================== */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --text-xs: 0.8125rem; /* 13px — naik dari default 12px */
+  --text-sm: 0.9375rem; /* 15px — naik dari default 14px */
+  --text-base: 1.0625rem; /* 17px — naik dari default 16px */
+  --text-lg: 1.1875rem; /* 19px */
+  --text-xl: 1.375rem; /* 22px */
+  --text-2xl: 1.625rem; /* 26px */
+
+  /* ==========================================================
+     RADIUS — Konsisten dengan wireframe (kartu & tombol rounded)
+     ========================================================== */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* ==========================================================
+   BASE STYLES
+   ========================================================== */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  color: var(--color-neutral-900);
+  background-color: var(--color-neutral-50);
+}
+
+/* Target sentuh minimum untuk tombol — penting untuk
+   pengguna yang kurang terbiasa teknologi (Ease of Use). */
+button,
+a[role='button'] {
+  min-height: 44px;
 }
