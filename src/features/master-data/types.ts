@@ -31,3 +31,30 @@ export interface ProductPrice {
 export interface ProductDetail extends ProductListItem {
   prices: ProductPrice[];
 }
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone_number: string | null;
+  address: string | null;
+  default_payment_term_days: number | null;
+  status: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone_number: string;
+  customer_type: 'general' | 'service' | 'workshop';
+  address: string | null;
+  status: string;
+}
+
+export interface Vehicle {
+  id: string;
+  customer_id: string;
+  police_plate: string | null;
+  motor_brand: string | null;
+  motor_model: string | null;
+  notes: string | null;
+}

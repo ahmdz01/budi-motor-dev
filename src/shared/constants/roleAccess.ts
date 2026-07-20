@@ -26,9 +26,12 @@ export const ROLE_HOME: Record<RoleCode, string> = {
 export const RESTRICTED_ROUTES: Record<string, RoleCode[]> = {
   '/dashboard': ['owner', 'admin', 'super_admin'],
   '/inventory': ['owner', 'admin', 'super_admin'],
+  '/suppliers': ['owner', 'admin', 'super_admin'],
+  '/customers': ['owner', 'admin', 'super_admin'],
   '/more': ['owner', 'admin', 'super_admin'],
   '/pos': ['owner', 'admin', 'kasir', 'super_admin'],
   '/service': ['owner', 'admin', 'kasir', 'mekanik', 'super_admin'],
+  '/purchases': ['owner', 'admin', 'super_admin'],
 };
 
 export const PUBLIC_PATHS = ['/login', '/forgot-pin'];
