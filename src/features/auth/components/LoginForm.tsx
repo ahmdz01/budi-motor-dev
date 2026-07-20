@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { signIn } from '../actions/signIn';
+import Link from 'next/link';
 
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +43,16 @@ export function LoginForm() {
         autoComplete="current-password"
         required
       />
-      {error && <p className="text-sm text-danger-600">{error}</p>}
+      {error && <p className="text-danger-600 text-sm">{error}</p>}
       <Button type="submit" isLoading={isPending}>
         Masuk
       </Button>
+      <Link
+        href="/forgot-pin"
+        className="text-center text-sm text-neutral-500 hover:text-neutral-700"
+      >
+        Lupa PIN?
+      </Link>
     </form>
   );
 }

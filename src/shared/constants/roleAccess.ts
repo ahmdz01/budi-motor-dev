@@ -31,4 +31,4 @@ export const RESTRICTED_ROUTES: Record<string, RoleCode[]> = {
   '/service': ['owner', 'admin', 'kasir', 'mekanik', 'super_admin'],
 };
 
-export const PUBLIC_PATHS = ['/login'];
+export const PUBLIC_PATHS = ['/login', '/forgot-pin'];

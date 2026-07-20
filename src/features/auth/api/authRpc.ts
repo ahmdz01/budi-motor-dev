@@ -33,3 +33,12 @@ export async function resetLoginAttempts(
     p_phone_number: phoneNumber,
   });
 }
+
+export async function requestPinReset(
+  supabase: SupabaseClient,
+  phoneNumber: string
+): Promise<Result<null>> {
+  return callRpc<{ p_phone_number: string }, null>(supabase, 'request_pin_reset', {
+    p_phone_number: phoneNumber,
+  });
+}

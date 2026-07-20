@@ -21,7 +21,6 @@ const eslintConfig = tseslint.config(
   prettierConfig,
   {
     rules: {
-      'no-unused-vars': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
       'prefer-const': 'error',
     },
