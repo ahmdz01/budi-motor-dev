@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/features/auth/lib/getCurrentUser';
 import { BottomNav } from '@/shared/components/BottomNav';
 import { LogoutButton } from '@/shared/components/LogoutButton';
+import { OfflineIndicator } from '@/shared/components/OfflineIndicator';
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -15,6 +16,8 @@ export default async function MainLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="min-h-screen bg-neutral-50">
+      <OfflineIndicator />
+
       <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
         <p className="text-sm text-neutral-600">
           Halo, <span className="font-medium text-neutral-900">{user.name}</span>
