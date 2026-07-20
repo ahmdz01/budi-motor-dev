@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Building2, Users, PackagePlus } from 'lucide-react';
 import { Card } from '@/shared/components/Card';
+import { ClipboardCheck } from 'lucide-react';
 
 export default function MorePage() {
   return (
@@ -18,14 +19,14 @@ export default function MorePage() {
       </Link>
 
       <Link href="/purchases">
-  <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
-    <PackagePlus size={20} className="text-accent-600" />
-    <div>
-      <p className="text-sm font-medium text-neutral-900">Barang Masuk</p>
-      <p className="text-xs text-neutral-500">Catat pembelian dari supplier</p>
-    </div>
-  </Card>
-</Link>
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <PackagePlus size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Barang Masuk</p>
+            <p className="text-xs text-neutral-500">Catat pembelian dari supplier</p>
+          </div>
+        </Card>
+      </Link>
 
       <Link href="/suppliers">
         <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
@@ -33,6 +34,16 @@ export default function MorePage() {
           <div>
             <p className="text-sm font-medium text-neutral-900">Supplier</p>
             <p className="text-xs text-neutral-500">Daftar dan detail supplier</p>
+          </div>
+        </Card>
+      </Link>
+
+      <Link href="/stock-opname">
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <ClipboardCheck size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Stock Opname</p>
+            <p className="text-xs text-neutral-500">Cocokkan stok fisik dengan sistem</p>
           </div>
         </Card>
       </Link>
