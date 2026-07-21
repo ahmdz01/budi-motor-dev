@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card } from '@/shared/components/Card';
 import { ServiceStatusBadge } from './ServiceStatusBadge';
 import type { ServiceListItem as ServiceListItemType } from '../types';
@@ -14,18 +15,20 @@ function formatVehicleLabel(item: ServiceListItemType): string {
 
 export function ServiceListItem({ service }: { service: ServiceListItemType }) {
   return (
-    <Card className="flex flex-col gap-1 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium text-neutral-900">{service.customer_name}</p>
-          <p className="text-xs text-neutral-500">{formatVehicleLabel(service)}</p>
+    <Link href={`/service/${service.id}`}>
+      <Card className="flex flex-col gap-1 p-3 active:bg-neutral-50">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium text-neutral-900">{service.customer_name}</p>
+            <p className="text-xs text-neutral-500">{formatVehicleLabel(service)}</p>
+          </div>
+          <ServiceStatusBadge status={service.status} />
         </div>
-        <ServiceStatusBadge status={service.status} />
-      </div>
-      <p className="line-clamp-2 text-sm text-neutral-600">{service.complaint}</p>
-      {service.is_warranty_claim && (
-        <span className="text-warning-700 text-xs font-medium">Klaim Garansi</span>
-      )}
-    </Card>
+        <p className="line-clamp-2 text-sm text-neutral-600">{service.complaint}</p>
+        {service.is_warranty_claim && (
+          <span className="text-warning-700 text-xs font-medium">Klaim Garansi</span>
+        )}
+      </Card>
+    </Link>
   );
 }
