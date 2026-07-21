@@ -44,10 +44,12 @@ begin
   end if;
 
   -- IDEMPOTENCY CHECK — baru ditambahkan Langkah 6.3.
-  select id, total_amount, amount_received
+  -- Kolom di-qualify pakai alias "t" karena "total_amount" bentrok
+  -- nama dengan OUT parameter di RETURNS TABLE (ambiguous kalau polos).
+  select t.id, t.total_amount, t.amount_received
   into v_existing
-  from public.transactions
-  where client_uuid = p_client_uuid;
+  from public.transactions t
+  where t.client_uuid = p_client_uuid;
 
   if found then
     return query select

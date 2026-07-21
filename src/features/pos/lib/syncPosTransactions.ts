@@ -14,9 +14,9 @@ type RpcCreatePosTransactionParams = PosTransactionParamsPayload & {
 };
 
 interface RpcCreatePosTransactionResult {
-  res_transaction_id: string;
-  res_total_amount: number;
-  res_change_amount: number;
+  transaction_id: string;
+  total_amount: number;
+  change_amount: number;
 }
 
 /**

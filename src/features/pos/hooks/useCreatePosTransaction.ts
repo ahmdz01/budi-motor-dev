@@ -29,16 +29,16 @@ export type PosTransactionParamsPayload = {
   }[];
   p_payment_method: string;
   p_amount_received: number | null;
-}
+};
 
 type RpcCreatePosTransactionParams = PosTransactionParamsPayload & {
   p_client_uuid: string;
 };
 
 interface RpcCreatePosTransactionResult {
-  res_transaction_id: string;
-  res_total_amount: number;
-  res_change_amount: number;
+  transaction_id: string;
+  total_amount: number;
+  change_amount: number;
 }
 
 interface CreatePosTransactionResult {
@@ -122,9 +122,9 @@ export function useCreatePosTransaction() {
         const row = result.data[0];
 
         return {
-          transaction_id: row.res_transaction_id,
-          total_amount: row.res_total_amount,
-          change_amount: row.res_change_amount,
+          transaction_id: row.transaction_id,
+          total_amount: row.total_amount,
+          change_amount: row.change_amount,
           is_queued: false,
         };
       } catch (err) {
