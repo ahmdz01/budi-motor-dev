@@ -6,7 +6,7 @@ import { logger } from '@/shared/lib/logger';
  * Wrapper generik untuk memanggil RPC Supabase (SECURITY DEFINER
  * functions sesuai Data Dictionary v3 Bagian 3).
  */
-export async function callRpc<TArgs extends Record<string, unknown>, TReturn>(
+export async function callRpc<TArgs extends object, TReturn>(
   supabase: SupabaseClient,
   functionName: string,
   args: TArgs
