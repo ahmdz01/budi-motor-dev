@@ -4,10 +4,13 @@ import { use } from 'react';
 import { Card } from '@/shared/components/Card';
 import { Badge } from '@/shared/components/Badge';
 import { useSupplier } from '@/features/master-data/hooks/useSupplier';
+import { useSupplierDebts } from '@/features/purchasing/hooks/useSupplierDebts';
+import { SupplierDebtCard } from '@/features/purchasing/components/SupplierDebtCard';
 
 export default function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: supplier, isLoading, error } = useSupplier(id);
+  const { data: debts, isLoading: debtsLoading } = useSupplierDebts(id);
 
   if (isLoading) return <div className="p-4 text-sm text-neutral-400">Memuat...</div>;
   if (error || !supplier)
@@ -40,6 +43,24 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
           </Badge>
         </div>
       </Card>
+
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-700">Hutang Aktif</h2>
+
+        {debtsLoading && <div className="h-20 animate-pulse rounded-lg bg-neutral-100" />}
+
+        {debts && debts.length === 0 && (
+          <p className="text-sm text-neutral-400">Tidak ada hutang aktif ke supplier ini.</p>
+        )}
+
+        {debts && debts.length > 0 && (
+          <div className="flex flex-col gap-3">
+            {debts.map((debt) => (
+              <SupplierDebtCard key={debt.id} debt={debt} supplierId={id} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

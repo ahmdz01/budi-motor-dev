@@ -35,3 +35,15 @@ export interface PurchaseDetail {
   amount_paid: number;
   items: PurchaseItemDetail[];
 }
+
+export type DebtStatus = 'unpaid' | 'paid';
+
+export interface SupplierDebt {
+  id: string;
+  purchase_id: string;
+  total_tagihan: number;
+  total_dibayar: number;
+  sisa_hutang: number;
+  due_date: string | null;
+  status: DebtStatus;
+}

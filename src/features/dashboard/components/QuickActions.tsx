@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { PackagePlus, Wrench, HandCoins, ClipboardCheck } from 'lucide-react';
 
 const actions = [
-  { href: '/inventory', label: 'Barang Masuk', icon: PackagePlus },
+  { href: '/purchases/new', label: 'Barang Masuk', icon: PackagePlus },
   { href: '/service', label: 'Servis Baru', icon: Wrench },
-  { href: '/inventory', label: 'Bayar Supplier', icon: HandCoins },
+  { href: '/suppliers', label: 'Bayar Supplier', icon: HandCoins },
   { href: '/inventory', label: 'Stock Opname', icon: ClipboardCheck },
 ] as const;
 

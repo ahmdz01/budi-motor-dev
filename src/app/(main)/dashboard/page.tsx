@@ -58,7 +58,7 @@ export default function DashboardPage() {
             label="Hutang Jatuh Tempo"
             value={formatCurrency(metrics.hutang_jatuh_tempo_total)}
             tone={metrics.hutang_jatuh_tempo_total > 0 ? 'danger' : 'neutral'}
-            onClick={() => router.push('/inventory')}
+            onClick={() => router.push('/suppliers')}
           />
           {isOwner && (
             <MetricCard
