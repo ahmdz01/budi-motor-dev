@@ -31,7 +31,7 @@ export function ServiceStatusHistoryTimeline({
                 <span className="text-xs text-neutral-400">oleh {entry.changed_by_name}</span>
               </div>
               {entry.reason && <p className="mt-0.5 text-xs text-neutral-500">{entry.reason}</p>}
-              <p className="mt-0.5 text-xs text-neutral-400">{formatDateTime(entry.created_at)}</p>
+              <p suppressHydrationWarning className="mt-0.5 text-xs text-neutral-400">{formatDateTime(entry.created_at)}</p>
             </div>
           </div>
         ))}

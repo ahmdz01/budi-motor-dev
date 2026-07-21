@@ -24,7 +24,7 @@ export default function StockOpnameHistoryPage() {
             <Link key={s.id} href={`/stock-opname/history/${s.id}`}>
               <Card className="flex items-center justify-between p-3 active:bg-neutral-50">
                 <div>
-                  <p className="text-sm font-medium text-neutral-900">
+                  <p suppressHydrationWarning className="text-sm font-medium text-neutral-900">
                     {new Date(s.started_at).toLocaleString('id-ID')}
                   </p>
                   <p className="text-xs text-neutral-500">{s.item_count} barang dicek</p>

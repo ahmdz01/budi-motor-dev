@@ -16,7 +16,7 @@ export default function StockOpnameDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="flex flex-col gap-4 p-4">
       <div>
-        <h1 className="text-xl font-semibold">
+        <h1 suppressHydrationWarning className="text-xl font-semibold">
           {new Date(session.started_at).toLocaleString('id-ID')}
         </h1>
         <p className="text-sm text-neutral-500">{session.items.length} barang dicek</p>
