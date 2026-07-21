@@ -24,8 +24,14 @@ export function VehicleQuickAddForm({
   } = useForm<VehicleInput>({ resolver: zodResolver(vehicleSchema) });
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
+    <div
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSubmit(onSubmit)();
+        }
+      }}
       className="flex flex-col gap-3 rounded-md border border-neutral-200 p-3"
     >
       <Input
@@ -53,13 +59,13 @@ export function VehicleQuickAddForm({
         error={errors.notes?.message}
       />
       <div className="flex gap-2">
-        <Button type="submit" size="md" isLoading={isSubmitting}>
+        <Button type="button" size="md" isLoading={isSubmitting} onClick={handleSubmit(onSubmit)}>
           Simpan Kendaraan
         </Button>
         <Button type="button" variant="secondary" size="md" onClick={onCancel}>
           Batal
         </Button>
       </div>
-    </form>
+    </div>
   );
 }

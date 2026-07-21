@@ -49,3 +49,14 @@ export interface ActiveMechanic {
   id: string;
   name: string;
 }
+
+export interface ServiceItem {
+  id: string;
+  item_type: 'product' | 'labor';
+  product_id: string | null;
+  name_snapshot: string;
+  price_snapshot: number;
+  qty: number;
+  subtotal: number;
+  created_at: string;
+}
