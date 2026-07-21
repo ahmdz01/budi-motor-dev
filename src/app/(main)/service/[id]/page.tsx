@@ -13,10 +13,10 @@ import { useCurrentUser } from '@/shared/contexts/UserContext';
 
 export default function ServiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-
   const { data: service, isLoading, error } = useServiceDetail(id);
   const { data: history } = useServiceStatusHistory(id);
   const { data: items } = useServiceItems(id);
+  const itemsTotal = (items ?? []).reduce((sum, i) => sum + i.subtotal, 0);
   const { roleCode, id: currentUserId } = useCurrentUser();
 
   if (isLoading) {
@@ -44,7 +44,11 @@ export default function ServiceDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div className="flex flex-col gap-4 p-4 pb-24">
       <ServiceDetailHeader service={service} />
-      <ServiceStatusActions service={service} />
+      <ServiceStatusActions
+        service={service}
+        hasItems={(items ?? []).length > 0}
+        itemsTotal={itemsTotal}
+      />
       <ServiceItemsList items={items ?? []} />
       {canAddItem && <AddServiceItemForm service={service} />}
       {history && <ServiceStatusHistoryTimeline history={history} />}
