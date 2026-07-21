@@ -52,8 +52,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(home, request.url));
     }
 
-    // Sudah login, cek apakah role-nya berhak akses path ini
-    const allowedRoles = RESTRICTED_ROUTES[pathname];
+    // PENTING: prefix match, bukan exact match — supaya sub-halaman
+    // seperti /inventory/[id] atau /inventory/new ikut terproteksi
+    // aturan yang sama dengan /inventory, tanpa perlu mendaftarkan
+    // setiap kombinasi path satu-satu.
+    const matchedRoute = Object.keys(RESTRICTED_ROUTES).find(
+      (route) => pathname === route || pathname.startsWith(`${route}/`)
+    );
+    const allowedRoles = matchedRoute ? RESTRICTED_ROUTES[matchedRoute] : undefined;
+
     if (allowedRoles && (!roleCode || !allowedRoles.includes(roleCode))) {
       return NextResponse.redirect(new URL(home, request.url));
     }

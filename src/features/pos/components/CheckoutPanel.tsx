@@ -29,7 +29,11 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [amountReceived, setAmountReceived] = useState(total);
   const [formError, setFormError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ transactionId: string; change: number } | null>(null);
+  const [result, setResult] = useState<{
+    transactionId: string | null;
+    change: number;
+    isQueued: boolean;
+  } | null>(null);
 
   const createTransaction = useCreatePosTransaction();
 
@@ -52,7 +56,11 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
       },
       {
         onSuccess: (data) => {
-          setResult({ transactionId: data.transaction_id, change: data.change_amount });
+          setResult({
+            transactionId: data.transaction_id,
+            change: data.change_amount,
+            isQueued: data.is_queued,
+          });
         },
       }
     );
@@ -67,10 +75,17 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
     return (
       <div className="fixed inset-0 z-40 flex flex-col bg-white p-4 pb-24">
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-          <p className="text-lg font-semibold text-neutral-900">Transaksi Berhasil</p>
+          <p className="text-lg font-semibold text-neutral-900">
+            {result.isQueued ? 'Transaksi Tersimpan' : 'Transaksi Berhasil'}
+          </p>
           <p className="text-sm text-neutral-500">Total {formatCurrency(total)}</p>
           {paymentMethod === 'cash' && (
             <p className="text-sm text-neutral-500">Kembalian: {formatCurrency(result.change)}</p>
+          )}
+          {result.isQueued && (
+            <p className="text-warning-700 bg-warning-50 mt-2 rounded-md px-3 py-2 text-xs">
+              Sedang offline — transaksi akan otomatis disinkronkan saat koneksi kembali.
+            </p>
           )}
         </div>
         <Button onClick={handleFinish}>Transaksi Baru</Button>

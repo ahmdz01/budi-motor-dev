@@ -23,7 +23,7 @@ export async function callRpc<TArgs extends object, TReturn>(
 
     return fail(
       error.code ?? 'RPC_ERROR',
-      'Terjadi kesalahan saat memproses permintaan. Coba lagi.'
+      error.message || error.details || 'Terjadi kesalahan saat memproses permintaan. Coba lagi.'
     );
   }
 
