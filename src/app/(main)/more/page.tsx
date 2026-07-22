@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Building2, Users, PackagePlus } from 'lucide-react';
+import { Building2, Users, PackagePlus, History, Wallet } from 'lucide-react';
 import { Card } from '@/shared/components/Card';
 import { ClipboardCheck } from 'lucide-react';
 
@@ -44,6 +44,26 @@ export default function MorePage() {
           <div>
             <p className="text-sm font-medium text-neutral-900">Stock Opname</p>
             <p className="text-xs text-neutral-500">Cocokkan stok fisik dengan sistem</p>
+          </div>
+        </Card>
+      </Link>
+
+      <Link href="/transactions">
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <History size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Riwayat Transaksi</p>
+            <p className="text-xs text-neutral-500">Transaksi POS & Servis</p>
+          </div>
+        </Card>
+      </Link>
+
+      <Link href="/financial">
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <Wallet size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Catatan Keuangan</p>
+            <p className="text-xs text-neutral-500">Setor/tarik Dana Restock, biaya operasional</p>
           </div>
         </Card>
       </Link>

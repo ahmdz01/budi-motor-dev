@@ -1,9 +1,16 @@
 import { Card } from '@/shared/components/Card';
 import { Badge } from '@/shared/components/Badge';
+import { Button } from '@/shared/components/Button';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
 import type { ServiceItem } from '../types';
 
-export function ServiceItemsList({ items }: { items: ServiceItem[] }) {
+interface ServiceItemsListProps {
+  items: ServiceItem[];
+  canReturn?: boolean;
+  onReturn?: (item: ServiceItem) => void;
+}
+
+export function ServiceItemsList({ items, canReturn = false, onReturn }: ServiceItemsListProps) {
   const total = items.reduce((sum, i) => sum + i.subtotal, 0);
 
   return (
@@ -27,7 +34,14 @@ export function ServiceItemsList({ items }: { items: ServiceItem[] }) {
               {item.qty} x {formatCurrency(item.price_snapshot)}
             </p>
           </div>
-          <span className="text-sm font-semibold">{formatCurrency(item.subtotal)}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold">{formatCurrency(item.subtotal)}</span>
+            {canReturn && onReturn && (
+              <Button variant="secondary" size="md" onClick={() => onReturn(item)}>
+                Retur
+              </Button>
+            )}
+          </div>
         </Card>
       ))}
 
