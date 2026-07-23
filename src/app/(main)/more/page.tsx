@@ -107,7 +107,7 @@ export default function MorePage() {
         </Card>
       </Link>
 
-      <Link href="/settings/profile">
+      <Link href="/settings">
         <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
           <Settings size={20} className="text-accent-600" />
           <div>
