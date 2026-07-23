@@ -1,5 +1,15 @@
 import Link from 'next/link';
-import { Building2, Users, PackagePlus, History, Wallet } from 'lucide-react';
+import {
+  Building2,
+  Users,
+  PackagePlus,
+  History,
+  Wallet,
+  BarChart3,
+  Wrench,
+  Boxes,
+  Settings,
+} from 'lucide-react';
 import { Card } from '@/shared/components/Card';
 import { ClipboardCheck } from 'lucide-react';
 
@@ -68,10 +78,46 @@ export default function MorePage() {
         </Card>
       </Link>
 
-      <p className="text-sm text-neutral-500">
-        Menu Laporan dan Pengaturan akan tersedia di sini setelah masing-masing modul selesai
-        dibangun.
-      </p>
+      <Link href="/reports/sales">
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <BarChart3 size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Laporan Penjualan</p>
+            <p className="text-xs text-neutral-500">Omzet, laba, dan rincian harian</p>
+          </div>
+        </Card>
+      </Link>
+      <Link href="/reports/service">
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <Wrench size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Laporan Servis</p>
+            <p className="text-xs text-neutral-500">Status servis dan performa mekanik</p>
+          </div>
+        </Card>
+      </Link>
+
+      <Link href="/reports/inventory">
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <Boxes size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Laporan Inventory</p>
+            <p className="text-xs text-neutral-500">Nilai stok, barang menipis, pergerakan</p>
+          </div>
+        </Card>
+      </Link>
+
+      <Link href="/settings/profile">
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <Settings size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Pengaturan</p>
+            <p className="text-xs text-neutral-500">Profil toko, pengguna, dan lainnya</p>
+          </div>
+        </Card>
+      </Link>
+
+      <p className="text-sm text-neutral-500">Fitur pengguna & pengaturan harga menyusul.</p>
     </div>
   );
 }

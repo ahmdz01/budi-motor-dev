@@ -85,3 +85,21 @@ button,
 a[role='button'] {
   min-height: 44px;
 }
+
+@media print {
+  /* Sembunyikan navigasi & elemen interaktif saat mencetak —
+     hanya konten laporan yang relevan untuk hasil cetak/PDF. */
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  main {
+    padding-bottom: 0 !important;
+  }
+}

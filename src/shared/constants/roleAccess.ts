@@ -35,6 +35,8 @@ export const RESTRICTED_ROUTES: Record<string, RoleCode[]> = {
   '/stock-opname': ['owner', 'admin', 'super_admin'],
   '/transactions': ['owner', 'admin', 'kasir', 'super_admin'],
   '/financial': ['owner', 'admin', 'super_admin'],
+  '/reports': ['owner', 'admin', 'super_admin'],
+  '/settings': ['owner', 'admin', 'super_admin'],
 };
 
 export const PUBLIC_PATHS = ['/login', '/forgot-pin'];
