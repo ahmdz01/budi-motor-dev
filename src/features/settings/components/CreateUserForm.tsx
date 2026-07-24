@@ -44,7 +44,6 @@ export function CreateUserForm() {
         return;
       }
       router.push('/settings/users');
-      router.refresh();
     });
   }
 
