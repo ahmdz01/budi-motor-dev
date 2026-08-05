@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { QueryProvider } from '@/shared/components/providers/QueryProvider';
 import './globals.css';
+import { ServiceWorkerRegistration } from '@/shared/components/ServiceWorkerRegistration';
 
 export const metadata: Metadata = {
   title: 'Budi Motor',
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="id" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <ServiceWorkerRegistration />
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
