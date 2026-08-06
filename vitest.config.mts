@@ -8,6 +8,7 @@ export default defineConfig({
     testTimeout: 15000,
     include: ['tests/**/*.test.ts'],
     passWithNoTests: true,
+    fileParallelism: false, // integration test nembak DB bersama — harus bergiliran, bukan rebutan
   },
   resolve: {
     alias: {
