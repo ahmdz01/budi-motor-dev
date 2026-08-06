@@ -108,11 +108,11 @@ describe('sp_confirm_service_payment', () => {
       p_service_id: serviceId,
       p_client_uuid: crypto.randomUUID(),
       p_payment_method: 'cash',
-      p_amount_received: 120000, // (2 x 50.000) + 20.000
+      p_amount_received: 130000, // (2 x 55.000, tier 'service') + 20.000
     });
 
     expect(error).toBeNull();
-    expect(data![0].total_amount).toBe(120000);
+    expect(data![0].total_amount).toBe(130000);
     expect(data![0].change_amount).toBe(0);
 
     const { data: tx } = await admin.client
@@ -133,9 +133,9 @@ describe('sp_confirm_service_payment', () => {
     const cashEntry = ledger!.find((l) => l.category === 'cash');
     const profitEntry = ledger!.find((l) => l.category === 'profit');
 
-    expect(cashEntry!.amount).toBe(120000);
-    // Profit = 120.000 - HPP produk (2 x 30.000 = 60.000) - HPP jasa (0) = 60.000.
-    expect(Number(profitEntry!.amount)).toBe(60000);
+    expect(cashEntry!.amount).toBe(130000);
+    // Profit = 130.000 - HPP produk (2 x 30.000 = 60.000) - HPP jasa (0) = 70.000.
+    expect(Number(profitEntry!.amount)).toBe(70000);
   });
 
   it('Mekanik TIDAK BOLEH konfirmasi pembayaran (bukan tugasnya)', async () => {
@@ -188,14 +188,14 @@ describe('sp_confirm_service_payment', () => {
       p_service_id: serviceId,
       p_client_uuid: clientUuid,
       p_payment_method: 'cash',
-      p_amount_received: 120000,
+      p_amount_received: 130000,
     });
 
     const second = await kasir.client.rpc('sp_confirm_service_payment', {
       p_service_id: serviceId,
       p_client_uuid: clientUuid,
       p_payment_method: 'cash',
-      p_amount_received: 120000,
+      p_amount_received: 130000,
     });
 
     expect(first.error).toBeNull();
