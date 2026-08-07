@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-  "dev": "next dev --hostname 0.0.0.0",
-  "build": "next build",
-  "start": "next start",
-  "lint": "eslint .",
-  "format": "prettier --write .",
-  "format:check": "prettier --check .",
-  "test": "vitest"
-},
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest"
+  },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
     "@supabase/ssr": "^0.12.3",
