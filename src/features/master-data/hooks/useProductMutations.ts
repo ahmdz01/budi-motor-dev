@@ -132,3 +132,34 @@ export function useUpdateProduct(productId: string) {
     },
   });
 }
+
+export function useDeactivateProduct() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: async (productId: string) => {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) throw new Error('Sesi login tidak ditemukan.');
+
+      // Soft delete — bukan tabel finansial inti, jadi cukup RLS
+      // biasa (dibatasi role Admin/Owner), tidak perlu RPC.
+      // Barang tidak dihapus fisik, hanya disembunyikan dari daftar
+      // operasional (useProducts sudah filter status = 'active').
+      const { error } = await supabase
+        .from('products')
+        .update({ status: 'inactive' })
+        .eq('id', productId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      router.push('/inventory');
+    },
+  });
+}

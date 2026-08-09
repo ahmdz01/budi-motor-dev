@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/shared/lib/supabase/client';
 
 interface BulkItem {
@@ -10,6 +11,7 @@ interface BulkItem {
 
 export function useBulkCreateProducts() {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   return useMutation({
     mutationFn: async ({ categoryId, items }: { categoryId: string; items: BulkItem[] }) => {
@@ -21,7 +23,6 @@ export function useBulkCreateProducts() {
       if (!user) throw new Error('Sesi login tidak ditemukan.');
 
       // Insert seluruh barang dalam 1 kali panggilan (bukan loop satu-satu)
-      // — jauh lebih cepat untuk puluhan item sekaligus.
       const { data: products, error: productError } = await supabase
         .from('products')
         .insert(
@@ -33,11 +34,15 @@ export function useBulkCreateProducts() {
         )
         .select('id, name');
 
-      if (productError) throw productError;
+      if (productError) {
+        throw new Error(productError.message || 'Gagal menyimpan barang.');
+      }
 
-      // Cocokkan produk yang baru dibuat dengan harga aslinya (by nama),
-      // lalu buat 3 baris harga (Umum/Servis/Bengkel) untuk SETIAP produk
-      // — sesuai kesepakatan: harga sama di ketiga tipe untuk input cepat.
+      if (!products || products.length === 0) {
+        throw new Error('Tidak ada barang yang berhasil disimpan.');
+      }
+
+      // Cocokkan produk yang baru dibuat dengan harga aslinya (by nama)
       const priceRows = products.flatMap((p) => {
         const original = items.find((i) => i.name === p.name);
         if (!original) return [];
@@ -49,14 +54,18 @@ export function useBulkCreateProducts() {
         }));
       });
 
-      const { error: priceError } = await supabase.from('product_prices').insert(priceRows);
-
-      if (priceError) throw priceError;
+      if (priceRows.length > 0) {
+        const { error: priceError } = await supabase.from('product_prices').insert(priceRows);
+        if (priceError) {
+          throw new Error(priceError.message || 'Gagal menyimpan harga barang.');
+        }
+      }
 
       return products.length;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      router.push('/inventory');
     },
   });
 }

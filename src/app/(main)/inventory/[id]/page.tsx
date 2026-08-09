@@ -7,6 +7,8 @@ import { Card } from '@/shared/components/Card';
 import { Button } from '@/shared/components/Button';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
 import { useProduct } from '@/features/master-data/hooks/useProduct';
+import { useDeactivateProduct } from '@/features/master-data/hooks/useProductMutations';
+import { Trash2 } from 'lucide-react';
 
 const priceLabel: Record<string, string> = {
   general: 'Harga Umum',
@@ -17,6 +19,17 @@ const priceLabel: Record<string, string> = {
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data: product, isLoading, error } = useProduct(id);
+
+  const deactivateProduct = useDeactivateProduct();
+
+  function handleDeactivate() {
+    if (!product) return;
+    const confirmed = window.confirm(
+      `Nonaktifkan "${product.name}"? Barang ini akan hilang dari daftar Inventory, tapi riwayat transaksi lama tetap aman.`
+    );
+    if (!confirmed) return;
+    deactivateProduct.mutate(id);
+  }
 
   if (isLoading) return <div className="p-4 text-sm text-neutral-400">Memuat...</div>;
   if (error || !product)
@@ -31,11 +44,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             {product.location_label ?? 'Tanpa lokasi'} · Barcode {product.barcode}
           </p>
         </div>
-        <Link href={`/inventory/${id}/edit`}>
-          <Button variant="secondary" size="md">
-            <Pencil size={16} /> Edit
+        <div className="flex gap-2">
+          <Link href={`/inventory/${id}/edit`}>
+            <Button variant="secondary" size="md">
+              <Pencil size={16} /> Edit
+            </Button>
+          </Link>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleDeactivate}
+            isLoading={deactivateProduct.isPending}
+          >
+            <Trash2 size={16} /> Nonaktifkan
           </Button>
-        </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
