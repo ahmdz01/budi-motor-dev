@@ -23,11 +23,18 @@ export default function InventoryPage() {
     <div className="flex flex-col gap-4 p-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Barang</h1>
-        <Link href="/inventory/new">
-          <Button size="md">
-            <Plus size={16} /> Tambah
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/inventory/bulk-add">
+            <Button size="md" variant="secondary">
+              Tambah Banyak
+            </Button>
+          </Link>
+          <Link href="/inventory/new">
+            <Button size="md">
+              <Plus size={16} /> Tambah
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="relative">
