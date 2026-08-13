@@ -142,3 +142,55 @@ export function useStockMovement(range: DateRange) {
     },
   });
 }
+
+export interface ExpiringBatchRow {
+  batchId: string;
+  productId: string;
+  productName: string;
+  qtySisa: number;
+  expiryDate: string;
+  daysUntilExpiry: number;
+}
+
+const EXPIRY_WARNING_DAYS = 30;
+
+export function useExpiringBatches() {
+  return useQuery({
+    queryKey: ['expiring-batches'],
+    queryFn: async (): Promise<ExpiringBatchRow[]> => {
+      const supabase = createClient();
+      const today = new Date();
+      const cutoff = new Date(today);
+      cutoff.setDate(cutoff.getDate() + EXPIRY_WARNING_DAYS);
+
+      // Cuma batch aktif (qty_sisa > 0) dengan expiry_date terisi —
+      // batch tanpa tanggal kedaluwarsa (banyak sparepart non-oli)
+      // otomatis tidak pernah muncul di sini.
+      const { data, error } = await supabase
+        .from('inventory_batches')
+        .select('id, product_id, qty_sisa, expiry_date, products(name)')
+        .eq('status', 'active')
+        .not('expiry_date', 'is', null)
+        .lte('expiry_date', cutoff.toISOString().split('T')[0])
+        .order('expiry_date', { ascending: true });
+
+      if (error) throw error;
+
+      return data.map((b) => {
+        const expiry = new Date(b.expiry_date as string);
+        const daysUntilExpiry = Math.ceil(
+          (expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        return {
+          batchId: b.id,
+          productId: b.product_id,
+          productName: (b.products as unknown as { name: string } | null)?.name ?? '-',
+          qtySisa: b.qty_sisa,
+          expiryDate: b.expiry_date as string,
+          daysUntilExpiry,
+        };
+      });
+    },
+    staleTime: 30 * 1000,
+  });
+}

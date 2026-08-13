@@ -3,12 +3,14 @@
 import { DateRangeFilter } from '@/features/reports/components/DateRangeFilter';
 import { InventorySummaryCards } from '@/features/reports/components/InventorySummaryCards';
 import { LowStockTable } from '@/features/reports/components/LowStockTable';
+import { ExpiringBatchTable } from '@/features/reports/components/ExpiringBatchTable';
 import { StockMovementTable } from '@/features/reports/components/StockMovementTable';
 import { useDateRangeState } from '@/features/reports/hooks/useDateRangeState';
 import {
   useInventoryReportSummary,
   useLowStockList,
   useStockMovement,
+  useExpiringBatches,
 } from '@/features/reports/hooks/useInventoryReport';
 import { ReportActions } from '@/features/reports/components/ReportActions';
 import { exportToExcel } from '@/features/reports/lib/exportExcel';
@@ -17,6 +19,7 @@ export default function InventoryReportPage() {
   const { range, preset, onChange } = useDateRangeState();
   const { data: summary, isLoading } = useInventoryReportSummary();
   const { data: lowStockRows, isLoading: lowStockLoading } = useLowStockList();
+  const { data: expiringRows, isLoading: expiringLoading } = useExpiringBatches();
   const { data: movementRows, isLoading: movementLoading } = useStockMovement(range);
 
   return (
@@ -70,6 +73,15 @@ export default function InventoryReportPage() {
           <div className="h-20 animate-pulse rounded-lg bg-neutral-100" />
         ) : (
           <LowStockTable rows={lowStockRows ?? []} />
+        )}
+      </div>
+
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-neutral-700">Mendekati Kedaluwarsa (30 Hari)</h2>
+        {expiringLoading ? (
+          <div className="h-20 animate-pulse rounded-lg bg-neutral-100" />
+        ) : (
+          <ExpiringBatchTable rows={expiringRows ?? []} />
         )}
       </div>
 
