@@ -9,6 +9,7 @@ import {
   Wrench,
   Boxes,
   Settings,
+  Tag,
 } from 'lucide-react';
 import { Card } from '@/shared/components/Card';
 import { ClipboardCheck } from 'lucide-react';
@@ -103,6 +104,16 @@ export default function MorePage() {
           <div>
             <p className="text-sm font-medium text-neutral-900">Laporan Inventory</p>
             <p className="text-xs text-neutral-500">Nilai stok, barang menipis, pergerakan</p>
+          </div>
+        </Card>
+      </Link>
+
+      <Link href="/reports/price-list">
+        <Card className="flex items-center gap-3 p-3 active:bg-neutral-50">
+          <Tag size={20} className="text-accent-600" />
+          <div>
+            <p className="text-sm font-medium text-neutral-900">Daftar Harga</p>
+            <p className="text-xs text-neutral-500">Lihat & cetak harga semua barang</p>
           </div>
         </Card>
       </Link>
