@@ -107,5 +107,5 @@ test('Konfirmasi Pembayaran Servis: bayar tunai, kembalian benar', async ({ page
 
   await expect(page.getByText('Pembayaran Berhasil')).toBeVisible({ timeout: 10000 });
   // 150.000 dibayar - 100.000 (2x50.000) = 50.000 kembalian.
-  await expect(page.getByText(/50\.000/)).toBeVisible();
+  await expect(page.getByText(/Kembalian:\s*Rp\s?50\.000/)).toBeVisible();
 });
