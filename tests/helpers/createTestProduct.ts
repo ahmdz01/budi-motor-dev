@@ -29,6 +29,7 @@ export async function createTestProduct({
 
   return {
     productId: product.id,
+    name,
     prices,
     async cleanup() {
       // Urutan penting: hapus anak (batch/consumptions) sebelum produknya.

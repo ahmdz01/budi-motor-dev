@@ -315,6 +315,7 @@ export function ServiceStatusActions({ service, hasItems, itemsTotal }: ServiceS
         {paymentMethod === 'cash' && (
           <div className="flex flex-col gap-2">
             <Input
+              id="amountReceived"
               label="Uang Diterima"
               type="number"
               min={0}
