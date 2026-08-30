@@ -8,7 +8,10 @@ import { useBulkCreateProducts } from '../hooks/useBulkCreateProducts';
 
 interface ParsedLine {
   name: string;
-  price: number;
+  brandName: string;
+  priceSell: number;
+  priceCost: number;
+  qty: number;
 }
 
 interface ParseError {
@@ -20,29 +23,49 @@ function parseInput(text: string): { valid: ParsedLine[]; errors: ParseError[] }
   const valid: ParsedLine[] = [];
   const errors: ParseError[] = [];
 
-  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
 
   for (const line of lines) {
-    const parts = line.split(',');
-    if (parts.length !== 2) {
-      errors.push({ line, reason: 'Harus ada 1 koma memisahkan nama dan harga' });
+    const parts = line.split(',').map((p) => p.trim());
+
+    if (parts.length !== 5) {
+      errors.push({
+        line,
+        reason: 'Harus ada 5 bagian dipisah koma: Nama, Merek, Harga Jual, Harga Beli, Qty',
+      });
       continue;
     }
 
-    const name = parts[0].trim();
-    const priceText = parts[1].trim().replace(/[^0-9]/g, ''); // buang titik/spasi
-    const price = Number(priceText);
+    const [name, brandName, sellText, costText, qtyText] = parts;
+    const priceSell = Number(sellText.replace(/[^0-9]/g, ''));
+    const priceCost = Number(costText.replace(/[^0-9]/g, ''));
+    const qty = Number(qtyText.replace(/[^0-9]/g, ''));
 
     if (!name) {
       errors.push({ line, reason: 'Nama tidak boleh kosong' });
       continue;
     }
-    if (!price || price <= 0) {
-      errors.push({ line, reason: 'Harga tidak valid' });
+    if (!priceSell || priceSell <= 0) {
+      errors.push({ line, reason: 'Harga Jual tidak valid' });
+      continue;
+    }
+    if (!priceCost || priceCost <= 0) {
+      errors.push({ line, reason: 'Harga Beli tidak valid (wajib diisi, tidak boleh 0)' });
+      continue;
+    }
+    if (priceCost >= priceSell) {
+      errors.push({ line, reason: 'Harga Beli tidak boleh sama/lebih besar dari Harga Jual' });
+      continue;
+    }
+    if (qty < 0 || isNaN(qty)) {
+      errors.push({ line, reason: 'Qty tidak valid (boleh 0 kalau belum ada stok)' });
       continue;
     }
 
-    valid.push({ name, price });
+    valid.push({ name, brandName, priceSell, priceCost, qty });
   }
 
   return { valid, errors };
@@ -67,7 +90,7 @@ export function BulkAddForm() {
       { categoryId, items: valid },
       {
         onSuccess: (count) => {
-          setResult(`${count} barang berhasil ditambahkan.`);
+          setResult(`${count} barang berhasil ditambahkan beserta stoknya.`);
           setText('');
         },
       }
@@ -90,15 +113,21 @@ export function BulkAddForm() {
           Daftar Barang (1 baris = 1 barang)
         </label>
         <p className="text-xs text-neutral-500">
-          Format: <span className="font-mono">Nama Barang, Harga</span> — contoh:
+          Format: <span className="font-mono">Nama, Merek, Harga Jual, Harga Beli, Qty</span>
           <br />
-          <span className="font-mono">Oli Federal 20W-50 0.8L, 55000</span>
+          Merek boleh dikosongkan (tetap tulis koma-nya). Contoh:
+          <br />
+          <span className="font-mono">Oli Federal 20W-50 0.8L, Federal, 55000, 45000, 12</span>
+          <br />
+          <span className="font-mono">Oli Tanpa Merek 1L, , 40000, 32000, 5</span>
         </p>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={10}
-          placeholder={'Oli Federal 20W-50 0.8L, 55000\nOli Yamalube Sport 10W-40 1L, 62000'}
+          placeholder={
+            'Oli Federal 20W-50 0.8L, Federal, 55000, 45000, 12\nOli Yamalube Sport 10W-40 1L, Yamalube, 62000, 50000, 8'
+          }
           className="rounded-md border border-neutral-300 px-4 py-2.5 font-mono text-sm focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-100"
         />
       </div>
@@ -119,9 +148,7 @@ export function BulkAddForm() {
         </div>
       )}
 
-      {bulkCreate.error && (
-        <p className="text-danger-600 text-sm">{bulkCreate.error.message}</p>
-      )}
+      {bulkCreate.error && <p className="text-danger-600 text-sm">{bulkCreate.error.message}</p>}
       {result && <p className="text-success-600 text-sm">{result}</p>}
 
       <Button
