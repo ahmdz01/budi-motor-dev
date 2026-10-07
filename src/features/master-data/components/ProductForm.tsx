@@ -13,8 +13,8 @@ import { productSchema, type ProductInput } from '../validation/productSchema';
 import type { ProductDetail } from '../types';
 
 interface ProductFormProps {
-  defaultValues?: Partial<ProductInput>;
   existingProduct?: ProductDetail;
+  defaultValues?: Partial<ProductInput>;
   onSubmit: (input: ProductInput) => void;
   isSubmitting: boolean;
   submitError?: string | null;
@@ -22,7 +22,6 @@ interface ProductFormProps {
 
 export function ProductForm({
   defaultValues,
-  existingProduct,
   onSubmit,
   isSubmitting,
   submitError,
@@ -93,14 +92,16 @@ export function ProductForm({
         error={errors.minStock?.message}
       />
 
-      {!existingProduct && (
-        <Input
-          id="barcode"
-          label="Barcode (opsional — kosongkan untuk generate otomatis)"
-          {...register('barcode')}
-          error={errors.barcode?.message}
-        />
-      )}
+      <div className="rounded-md border border-neutral-200 bg-neutral-50 p-3">
+  <p className="text-sm font-medium text-neutral-700">
+    Barcode Internal
+  </p>
+
+  <p className="mt-1 text-xs text-neutral-500">
+    Barcode akan dibuat otomatis oleh sistem setelah barang disimpan.
+    Barcode menggunakan SKU internal BM Motor.
+  </p>
+</div>
 
       <div className="rounded-md border border-neutral-200 p-3">
         <p className="mb-3 text-sm font-medium text-neutral-700">Harga Jual</p>

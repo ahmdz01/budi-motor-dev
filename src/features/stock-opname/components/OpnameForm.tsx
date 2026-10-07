@@ -12,8 +12,18 @@ export function OpnameForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const createOpname = useCreateStockOpname();
 
-  function addItem(product: { id: string; name: string; totalStock: number }) {
-    setItems((prev) => [
+  function addItem(product: {
+  id: string;
+  name: string;
+  totalStock: number;
+}) {
+  setItems((prev) => {
+    // Jangan masukkan barang yang sama dua kali.
+    if (prev.some((item) => item.productId === product.id)) {
+      return prev;
+    }
+
+    return [
       ...prev,
       {
         productId: product.id,
@@ -23,8 +33,9 @@ export function OpnameForm() {
         reason: '',
         hargaBeliBaru: null,
       },
-    ]);
-  }
+    ];
+  });
+}
 
   function updateItem(index: number, updated: OpnameCartItem) {
     setItems((prev) => prev.map((it, i) => (i === index ? updated : it)));
@@ -76,9 +87,13 @@ export function OpnameForm() {
         <p className="text-danger-600 text-sm">{createOpname.error.message}</p>
       )}
 
-      <Button onClick={handleSubmit} isLoading={createOpname.isPending}>
-        Simpan Penyesuaian Stok
-      </Button>
+      <Button
+  onClick={handleSubmit}
+  isLoading={createOpname.isPending}
+  disabled={items.length === 0 || createOpname.isPending}
+>
+  Simpan Penyesuaian Stok
+</Button>
     </div>
   );
 }

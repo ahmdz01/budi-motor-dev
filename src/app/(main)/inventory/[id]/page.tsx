@@ -2,13 +2,13 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { Pencil } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Card } from '@/shared/components/Card';
 import { Button } from '@/shared/components/Button';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
 import { useProduct } from '@/features/master-data/hooks/useProduct';
 import { useDeactivateProduct } from '@/features/master-data/hooks/useProductMutations';
-import { Trash2 } from 'lucide-react';
+import { BarcodePrint } from '@/features/master-data/components/BarcodePrint';
 
 const priceLabel: Record<string, string> = {
   general: 'Harga Umum',
@@ -45,20 +45,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <div className="flex gap-2">
-          <Link href={`/inventory/${id}/edit`}>
-            <Button variant="secondary" size="md">
-              <Pencil size={16} /> Edit
-            </Button>
-          </Link>
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={handleDeactivate}
-            isLoading={deactivateProduct.isPending}
-          >
-            <Trash2 size={16} /> Nonaktifkan
-          </Button>
-        </div>
+  <BarcodePrint
+    barcode={product.barcode ?? product.sku}
+    name={product.name}
+  />
+
+  <Link href={`/inventory/${id}/edit`}>
+    <Button variant="secondary" size="md">
+      <Pencil size={16} /> Edit
+    </Button>
+  </Link>
+
+  <Button
+    variant="secondary"
+    size="md"
+    onClick={handleDeactivate}
+    isLoading={deactivateProduct.isPending}
+  >
+    <Trash2 size={16} /> Nonaktifkan
+  </Button>
+</div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">

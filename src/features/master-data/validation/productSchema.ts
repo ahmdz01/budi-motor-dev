@@ -6,7 +6,6 @@ export const productSchema = z.object({
   brandId: z.string().uuid('Pilih merek').nullable(),
   locationLabel: z.string().max(30).optional(),
   minStock: z.coerce.number().int().min(0, 'Minimal 0'),
-  barcode: z.string().max(50).optional(),
   priceGeneral: z.coerce.number().positive('Harga harus lebih dari 0'),
   priceService: z.coerce.number().positive('Harga harus lebih dari 0'),
   priceWorkshop: z.coerce.number().positive('Harga harus lebih dari 0'),

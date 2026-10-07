@@ -29,7 +29,7 @@ export function useCreateProduct() {
           brand_id: input.brandId,
           location_label: input.locationLabel || null,
           min_stock: input.minStock,
-          barcode: input.barcode || null,
+          barcode: null,
           created_by: user.id,
         })
         .select('id')
