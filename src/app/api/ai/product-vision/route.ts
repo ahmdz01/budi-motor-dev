@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 const productSchema = {
   type: 'object',
   additionalProperties: false,
@@ -40,6 +36,25 @@ const productSchema = {
 
 export async function POST(request: Request) {
   try {
+    // API key hanya dibutuhkan ketika endpoint benar-benar dipanggil.
+    // Dengan cara ini, proses build Vercel tidak gagal jika
+    // OPENAI_API_KEY belum tersedia pada saat build.
+    const apiKey = process.env.OPENAI_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          error: 'OPENAI_API_KEY belum dikonfigurasi di server.',
+        },
+        { status: 503 }
+      );
+    }
+
+    // OpenAI client dibuat saat runtime, bukan saat module di-load.
+    const openai = new OpenAI({
+      apiKey,
+    });
+
     const formData = await request.formData();
 
     const file = formData.get('image');
