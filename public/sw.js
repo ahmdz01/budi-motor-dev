@@ -1,3 +1,5 @@
+/* global self */
+
 // Service Worker minimal — HANYA untuk syarat "installability" PWA.
 // SENGAJA TIDAK melakukan caching/offline strategy apa pun di sini.
 // Offline queue untuk data POS sudah ditangani terpisah lewat

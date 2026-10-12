@@ -1,3 +1,4 @@
+
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
@@ -7,10 +8,20 @@ import {
   type RoleCode,
 } from '@/shared/constants/roleAccess';
 
+const VALID_ROLE_CODES: ReadonlySet<string> = new Set([
+  'owner',
+  'admin',
+  'kasir',
+  'mekanik',
+  'super_admin',
+]);
+
+function isValidRoleCode(value: unknown): value is RoleCode {
+  return typeof value === 'string' && VALID_ROLE_CODES.has(value);
+}
+
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,14 +32,18 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
+
           supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
+
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
         },
       },
-    }
+    },
   );
 
   const {
@@ -38,30 +53,68 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
 
-  // Belum login, mencoba akses halaman yang butuh login -> lempar ke Login
   if (!user && !isPublicPath && pathname !== '/') {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
   if (user) {
-    const roleCode = user.app_metadata?.role_code as RoleCode | undefined;
-    const home = roleCode ? ROLE_HOME[roleCode] : '/dashboard';
+    const rawRoleCode: unknown = user.app_metadata?.role_code;
 
-    // Sudah login tapi membuka halaman Login -> lempar ke halaman utamanya
+    // Pengguna tanpa role aplikasi valid tidak boleh masuk.
+    if (!isValidRoleCode(rawRoleCode)) {
+      // Usahakan mengakhiri session di Supabase Auth.
+      // Pembersihan cookie di bawah tetap dilakukan jika permintaan gagal.
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch {
+        // Jangan biarkan error jaringan melewati pemeriksaan akses.
+      }
+
+      const redirectResponse = NextResponse.redirect(
+        new URL('/login', request.url),
+      );
+
+      // Pertahankan perubahan cookie yang dibuat oleh Supabase SSR.
+      for (const cookie of supabaseResponse.cookies.getAll()) {
+        redirectResponse.cookies.set(cookie);
+      }
+
+      // Bersihkan semua cookie session Supabase, termasuk cookie yang
+      // dipecah menjadi beberapa bagian.
+      const authCookieNames = new Set([
+        ...request.cookies.getAll().map((cookie) => cookie.name),
+        ...supabaseResponse.cookies.getAll().map((cookie) => cookie.name),
+      ]);
+
+      for (const name of authCookieNames) {
+        if (name.startsWith('sb-') && name.includes('-auth-token')) {
+          redirectResponse.cookies.set(name, '', {
+            path: '/',
+            maxAge: 0,
+            expires: new Date(0),
+          });
+        }
+      }
+
+      return redirectResponse;
+    }
+
+    const roleCode = rawRoleCode;
+    const home = ROLE_HOME[roleCode];
+
     if (isPublicPath) {
       return NextResponse.redirect(new URL(home, request.url));
     }
 
-    // PENTING: prefix match, bukan exact match — supaya sub-halaman
-    // seperti /inventory/[id] atau /inventory/new ikut terproteksi
-    // aturan yang sama dengan /inventory, tanpa perlu mendaftarkan
-    // setiap kombinasi path satu-satu.
     const matchedRoute = Object.keys(RESTRICTED_ROUTES).find(
-      (route) => pathname === route || pathname.startsWith(`${route}/`)
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
     );
-    const allowedRoles = matchedRoute ? RESTRICTED_ROUTES[matchedRoute] : undefined;
 
-    if (allowedRoles && (!roleCode || !allowedRoles.includes(roleCode))) {
+    const allowedRoles = matchedRoute
+      ? RESTRICTED_ROUTES[matchedRoute]
+      : undefined;
+
+    if (allowedRoles && !allowedRoles.includes(roleCode)) {
       return NextResponse.redirect(new URL(home, request.url));
     }
   }

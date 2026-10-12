@@ -47,3 +47,6 @@ next-env.d.ts
 # Editor
 .vscode/*
 !.vscode/extensions.json
+
+# Supabase
+supabase/.temp/

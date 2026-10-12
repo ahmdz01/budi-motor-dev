@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,12 @@ interface CreatePosTransactionInput {
   items: CartItem[];
   paymentMethod: PaymentMethod;
   amountReceived: number | null;
+
+  /**
+   * UUID stabil dari sesi checkout.
+   * Jika tidak diberikan, UUID dibuat untuk percobaan mutasi ini.
+   */
+  clientUuid?: string;
 }
 
 export type PosTransactionParamsPayload = {
@@ -48,31 +55,123 @@ interface CreatePosTransactionResult {
   is_queued: boolean;
 }
 
+interface RpcErrorLike {
+  code?: unknown;
+  status?: unknown;
+  message?: unknown;
+}
+
 /**
- * Mendeteksi kegagalan karena offline.
+ * Mendeteksi kegagalan jaringan tanpa hanya bergantung pada kata
+ * "fetch", yang tidak mencakup pesan seperti "Load failed".
  */
 function isOfflineFailure(err: unknown): boolean {
-  if (!navigator.onLine) return true;
-  if (err instanceof TypeError) return true;
-  if (err instanceof Error && /fetch/i.test(err.message)) return true;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return true;
+  }
 
-  return false;
+  if (err instanceof TypeError) {
+    return true;
+  }
+
+  if (err instanceof Error) {
+    return /(network|load failed|connection|socket|timed?\s*out|timeout|offline|internet|aborted)/i.test(
+      err.message,
+    );
+  }
+
+  if (!err || typeof err !== 'object') {
+    return false;
+  }
+
+  const rpcError = err as RpcErrorLike;
+  const status =
+    typeof rpcError.status === 'number'
+      ? rpcError.status
+      : null;
+  const code =
+    typeof rpcError.code === 'string'
+      ? rpcError.code.trim()
+      : '';
+  const message =
+    typeof rpcError.message === 'string'
+      ? rpcError.message
+      : '';
+
+  // Supabase dapat mengembalikan status 0 saat tidak ada respons HTTP.
+  if (status === 0) {
+    return true;
+  }
+
+  // Kode Postgres/PostgREST atau status HTTP biasanya menunjukkan
+  // error aplikasi/server, bukan otomatis kegagalan jaringan.
+  if (status !== null && status > 0 && code.length > 0) {
+    return false;
+  }
+
+  if (
+    /(network|load failed|connection|socket|timed?\s*out|timeout|offline|internet|aborted)/i.test(
+      message,
+    )
+  ) {
+    return true;
+  }
+
+  // Respons error tanpa kode/status bisa terjadi ketika koneksi putus
+  // sebelum respons Supabase diterima.
+  return code.length === 0 && status === null;
 }
+
+/**
+ * Menyimpan transaksi ke antrean dengan UUID yang sama seperti
+ * percobaan online, sehingga retry tidak menjadi transaksi baru.
+ */
 
 async function queueTransaction(
   payload: PosTransactionParamsPayload,
-  items: CartItem[]
+  items: CartItem[],
+  clientUuid: string,
 ): Promise<CreatePosTransactionResult> {
-  const clientUuid = await enqueueOfflineAction('pos_transaction', payload);
+  const localDisplay = {
+    items: items.map((item) => {
+      const displayItem = item as CartItem & {
+        name?: string;
+        productName?: string;
+      };
+
+      return {
+        productId: item.productId,
+        name:
+          displayItem.name ??
+          displayItem.productName ??
+          item.productId,
+        qty: item.qty,
+        unitPrice: item.priceSnapshot,
+      };
+    }),
+    totalAmount: items.reduce(
+      (sum, item) => sum + item.priceSnapshot * item.qty,
+      0,
+    ),
+  };
+
+  const queuedClientUuid = await enqueueOfflineAction(
+    'pos_transaction',
+    {
+      ...payload,
+      _localDisplay: localDisplay,
+    },
+    clientUuid,
+  );
 
   logger.info('Transaksi POS di-antre (offline)', {
-    clientUuid,
+    clientUuid: queuedClientUuid,
     itemCount: items.length,
   });
 
-  const totalAmount = items.reduce((sum, item) => sum + item.priceSnapshot * item.qty, 0);
-
-  const changeAmount = (payload.p_amount_received ?? totalAmount) - totalAmount;
+  const totalAmount = localDisplay.totalAmount;
+  const changeAmount =
+    (payload.p_amount_received ?? totalAmount) - totalAmount;
 
   return {
     transaction_id: null,
@@ -86,7 +185,9 @@ export function useCreatePosTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: CreatePosTransactionInput): Promise<CreatePosTransactionResult> => {
+    mutationFn: async (
+      input: CreatePosTransactionInput,
+    ): Promise<CreatePosTransactionResult> => {
       const payload: PosTransactionParamsPayload = {
         p_customer_id: input.customerId,
         p_customer_type_used: input.customerTypeUsed,
@@ -98,13 +199,18 @@ export function useCreatePosTransaction() {
         p_amount_received: input.amountReceived,
       };
 
-      // Jika offline, langsung antrekan transaksi.
-      if (!navigator.onLine) {
-        return queueTransaction(payload, input.items);
+      // Buat atau gunakan UUID yang diberikan oleh sesi checkout.
+      // UUID ini tidak diganti saat transaksi masuk ke antrean offline.
+      const clientUuid = input.clientUuid ?? generateClientUuid();
+
+      if (
+        typeof navigator !== 'undefined' &&
+        !navigator.onLine
+      ) {
+        return queueTransaction(payload, input.items, clientUuid);
       }
 
       const supabase = createClient();
-      const clientUuid = generateClientUuid();
 
       try {
         const result = await callRpc<
@@ -116,6 +222,16 @@ export function useCreatePosTransaction() {
         });
 
         if (!result.success) {
+          // Periksa objek error asli sebelum mengubahnya menjadi Error
+          // biasa, agar kode/status Supabase tetap tersedia.
+          if (isOfflineFailure(result.error)) {
+            return queueTransaction(
+              payload,
+              input.items,
+              clientUuid,
+            );
+          }
+
           throw new Error(result.error.message);
         }
 
@@ -129,7 +245,11 @@ export function useCreatePosTransaction() {
         };
       } catch (err) {
         if (isOfflineFailure(err)) {
-          return queueTransaction(payload, input.items);
+          return queueTransaction(
+            payload,
+            input.items,
+            clientUuid,
+          );
         }
 
         throw err;

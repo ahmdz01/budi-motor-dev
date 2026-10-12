@@ -14,7 +14,6 @@ let mekanik: Awaited<ReturnType<typeof createTestUser>>;
 let product: Awaited<ReturnType<typeof createTestProduct>>;
 let customer: Awaited<ReturnType<typeof createTestCustomer>>;
 let serviceId: string;
-const itemsTotal = 2 * 50000; // 2 pcs x harga tier general default (50.000)
 
 test.beforeAll(async () => {
   if (!phoneNumber || !pin) {
@@ -24,7 +23,7 @@ test.beforeAll(async () => {
   const ownerClient = createAnonClient();
   const { data: signInData, error: signInError } = await ownerClient.auth.signInWithPassword({
     email: phoneToInternalEmail(phoneNumber),
-    password: padPin(pin),
+    password: padPin(phoneNumber, pin),
   });
   if (signInError || !signInData.user) {
     throw new Error(`Gagal login sebagai Owner untuk seed data E2E: ${signInError?.message}`);

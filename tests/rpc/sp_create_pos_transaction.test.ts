@@ -19,11 +19,11 @@ describe('sp_create_pos_transaction', () => {
   });
 
   afterAll(async () => {
-    await product.cleanup();
-    await mekanik.cleanup();
-    await kasir.cleanup();
-    await admin.cleanup();
-  });
+  if (product) await product.cleanup();
+  if (mekanik) await mekanik.cleanup();
+  if (kasir) await kasir.cleanup();
+  if (admin) await admin.cleanup();
+});
 
   it('Kasir bisa membuat transaksi POS dan stok berkurang sesuai qty', async () => {
     const { data, error } = await kasir.client.rpc('sp_create_pos_transaction', {

@@ -51,7 +51,7 @@ export async function createUser(formData: FormData): Promise<CreateUserResult> 
     // 2. Baru sekarang pakai service_role — setelah caller terverifikasi berhak.
     const serviceClient = createServiceRoleClient();
     const email = phoneToInternalEmail(phoneNumber);
-    const password = padPin(pin);
+    const password = padPin(phoneNumber, pin);
 
     const { data: newAuthUser, error: authError } = await serviceClient.auth.admin.createUser({
       email,
@@ -69,11 +69,12 @@ export async function createUser(formData: FormData): Promise<CreateUserResult> 
     }
 
     const { error: profileError } = await serviceClient.from('users').insert({
-      id: newAuthUser.user.id,
-      phone_number: phoneNumber,
-      name,
-      role_code: roleCode,
-    });
+  id: newAuthUser.user.id,
+  phone_number: phoneNumber,
+  name,
+  role_code: roleCode,
+  pin_version: 2,
+});
 
     if (profileError) {
       // Rollback: batalkan auth user supaya tidak ada akun "setengah jadi"

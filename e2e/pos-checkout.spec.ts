@@ -18,7 +18,7 @@ test.beforeAll(async () => {
   const ownerClient = createAnonClient();
   const { data: signInData, error: signInError } = await ownerClient.auth.signInWithPassword({
     email: phoneToInternalEmail(phoneNumber),
-    password: padPin(pin),
+    password: padPin(phoneNumber, pin),
   });
 
   if (signInError || !signInData.user) {

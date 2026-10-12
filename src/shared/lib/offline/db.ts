@@ -1,55 +1,68 @@
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-/**
- * Skema database lokal (IndexedDB) untuk offline queue.
- * SATU object store generik ('pending_actions') menampung semua
- * jenis aksi offline (transaksi POS, servis, dst) — dibedakan
- * lewat field 'entityType'. Ini menghindari perlu bikin store
- * terpisah untuk tiap modul bisnis yang belum tentu semuanya
- * butuh offline support (YAGNI).
- */
+import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
 export type OfflineActionStatus = 'pending' | 'syncing' | 'failed';
 
 export interface PendingAction {
-  clientUuid: string; // Primary key — sama dengan client_uuid di database
-  entityType: string; // contoh nanti: 'pos_transaction', 'service'
-  payload: Record<string, unknown>; // bentuk data mentah, divalidasi ulang saat sync
-  createdAt: string; // ISO timestamp
+  clientUuid: string;
+  entityType: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
   status: OfflineActionStatus;
   lastError?: string;
+  syncStartedAt?: string;
+
+  // true hanya jika kegagalan layak dicoba ulang otomatis.
+  lastErrorRetryable?: boolean;
+   // Pengaturan jeda retry otomatis.
+  retryCount?: number;
+  nextRetryAt?: string;
 }
 
 interface BudiMotorOfflineDB extends DBSchema {
   pending_actions: {
-    key: string; // clientUuid
+    key: string;
     value: PendingAction;
-    indexes: { 'by-status': OfflineActionStatus; 'by-createdAt': string };
+    indexes: {
+      'by-status': OfflineActionStatus;
+      'by-createdAt': string;
+    };
   };
 }
 
 const DB_NAME = 'budi-motor-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase<BudiMotorOfflineDB> | null = null;
 
-/**
- * Singleton connection — IndexedDB hanya boleh dibuka sekali per
- * sesi browser, membuka berulang-ulang tidak perlu dan sedikit
- * boros. Dipanggil lazy (baru buka koneksi saat pertama dibutuhkan).
- */
 export async function getOfflineDb() {
   if (dbInstance) return dbInstance;
 
-  dbInstance = await openDB<BudiMotorOfflineDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      const store = db.createObjectStore('pending_actions', {
-        keyPath: 'clientUuid',
-      });
-      store.createIndex('by-status', 'status');
-      store.createIndex('by-createdAt', 'createdAt');
+  dbInstance = await openDB<BudiMotorOfflineDB>(
+    DB_NAME,
+    DB_VERSION,
+    {
+      upgrade(db, _oldVersion, _newVersion, transaction) {
+        // Buat store hanya jika belum ada agar data lama tidak hilang.
+        if (!db.objectStoreNames.contains('pending_actions')) {
+          db.createObjectStore('pending_actions', {
+            keyPath: 'clientUuid',
+          });
+        }
+
+        // Pastikan indeks tersedia saat migrasi.
+        const store = transaction.objectStore('pending_actions');
+
+        if (!store.indexNames.contains('by-status')) {
+          store.createIndex('by-status', 'status');
+        }
+
+        if (!store.indexNames.contains('by-createdAt')) {
+          store.createIndex('by-createdAt', 'createdAt');
+        }
+      },
     },
-  });
+  );
 
   return dbInstance;
 }

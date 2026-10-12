@@ -103,8 +103,8 @@ export function BarcodePrint({
      * Label 3
      */
     const labels = Array.from(
-      { length: quantity },
-      (_, index) => `
+  { length: quantity },
+  () => `
         <div class="barcode-label">
           <div class="barcode-brand">
             BM MOTOR

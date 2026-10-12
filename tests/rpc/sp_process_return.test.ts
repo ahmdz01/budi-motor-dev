@@ -424,4 +424,31 @@ describe('sp_process_return', () => {
     expect(error).toBeNull();
     expect(await totalStok()).toBe(stokSebelum);
   });
+
+it('Refund melebihi nilai jual item ditolak tanpa mencatat retur', async () => {
+  const { transactionItemId } = await createPaidPosTransaction(1);
+
+  const { error } = await admin.client.rpc('sp_process_return', {
+    p_qty_returned: 1,
+    p_reason: 'Tes refund melebihi batas',
+    p_refund_amount: product.prices.general + 1,
+    p_transaction_item_id: transactionItemId,
+    p_service_item_id: null,
+    p_restock: true,
+  });
+
+  expect(error).not.toBeNull();
+  expect(error!.message).toContain(
+    'Jumlah refund melebihi batas maksimal',
+  );
+
+  // Kegagalan RPC harus membuat seluruh transaksi database rollback.
+  const { count, error: countError } = await supabaseAdmin
+    .from('returns')
+    .select('id', { count: 'exact', head: true })
+    .eq('transaction_item_id', transactionItemId);
+
+  expect(countError).toBeNull();
+  expect(count).toBe(0);
+});
 });

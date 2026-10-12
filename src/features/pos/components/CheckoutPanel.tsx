@@ -1,12 +1,17 @@
+
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, WifiOff, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
+import { generateClientUuid } from '@/shared/lib/offline/clientUuid';
 import { useCartStore } from '../stores/useCartStore';
-import { useCreatePosTransaction, type PaymentMethod } from '../hooks/useCreatePosTransaction';
+import {
+  useCreatePosTransaction,
+  type PaymentMethod,
+} from '../hooks/useCreatePosTransaction';
 
 const methods: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Tunai' },
@@ -24,11 +29,21 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
   const customerTypeUsed = useCartStore((s) => s.customerTypeUsed);
   const clearCart = useCartStore((s) => s.clear);
 
-  const total = items.reduce((sum, i) => sum + i.priceSnapshot * i.qty, 0);
+  const total = items.reduce(
+    (sum, item) => sum + item.priceSnapshot * item.qty,
+    0,
+  );
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethod>('cash');
   const [amountReceived, setAmountReceived] = useState(total);
   const [formError, setFormError] = useState<string | null>(null);
+  const [offlineSubmitting, setOfflineSubmitting] = useState(false);
+
+  // Satu UUID untuk seluruh sesi checkout ini.
+  // UUID tidak berubah hanya karena kasir mencoba membayar lagi.
+  const [clientUuid] = useState(() => generateClientUuid());
+
   const [result, setResult] = useState<{
     transactionId: string | null;
     change: number;
@@ -37,14 +52,22 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
 
   const createTransaction = useCreatePosTransaction();
 
-  const change = paymentMethod === 'cash' ? amountReceived - total : 0;
+  const change =
+    paymentMethod === 'cash' ? amountReceived - total : 0;
 
   function handleConfirm() {
     setFormError(null);
 
     if (paymentMethod === 'cash' && amountReceived < total) {
-      return setFormError('Uang diterima kurang dari total belanja.');
+      setFormError('Uang diterima kurang dari total belanja.');
+      return;
     }
+
+    const isOffline =
+      typeof navigator !== 'undefined' && !navigator.onLine;
+
+    // Beri tahu kasir saat proses antrean offline dimulai.
+    setOfflineSubmitting(isOffline);
 
     createTransaction.mutate(
       {
@@ -52,17 +75,26 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
         customerTypeUsed,
         items,
         paymentMethod,
-        amountReceived: paymentMethod === 'cash' ? amountReceived : null,
+        amountReceived:
+          paymentMethod === 'cash' ? amountReceived : null,
+        clientUuid,
       },
       {
         onSuccess: (data) => {
+          setOfflineSubmitting(false);
+
+          // Hasil ini baru diterima setelah penyimpanan
+          // online berhasil atau antrean lokal berhasil disimpan.
           setResult({
             transactionId: data.transaction_id,
             change: data.change_amount,
             isQueued: data.is_queued,
           });
         },
-      }
+        onError: () => {
+          setOfflineSubmitting(false);
+        },
+      },
     );
   }
 
@@ -74,21 +106,67 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
   if (result) {
     return (
       <div className="fixed inset-0 z-40 flex flex-col bg-white p-4 pb-24">
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
-          <p className="text-lg font-semibold text-neutral-900">
-            {result.isQueued ? 'Transaksi Tersimpan' : 'Transaksi Berhasil'}
-          </p>
-          <p className="text-sm text-neutral-500">Total {formatCurrency(total)}</p>
-          {paymentMethod === 'cash' && (
-            <p className="text-sm text-neutral-500">Kembalian: {formatCurrency(result.change)}</p>
-          )}
-          {result.isQueued && (
-            <p className="text-warning-700 bg-warning-50 mt-2 rounded-md px-3 py-2 text-xs">
-              Sedang offline — transaksi akan otomatis disinkronkan saat koneksi kembali.
-            </p>
+        <div
+          className="flex flex-1 flex-col items-center justify-center gap-3 text-center"
+          role="status"
+          aria-live="polite"
+        >
+          {result.isQueued ? (
+            <>
+              <WifiOff size={44} className="text-amber-600" />
+
+              <p className="text-lg font-semibold text-neutral-900">
+                Transaksi Disimpan Sementara
+              </p>
+
+              <p className="text-sm text-neutral-600">
+                Total {formatCurrency(total)}
+              </p>
+
+              {paymentMethod === 'cash' && (
+                <p className="text-sm text-neutral-600">
+                  Kembalian: {formatCurrency(result.change)}
+                </p>
+              )}
+
+              <div className="mt-2 w-full rounded-lg border border-amber-300 bg-amber-50 p-4 text-left text-sm text-amber-900">
+                <p className="font-semibold">
+                  Belum tersimpan di server
+                </p>
+                <p className="mt-1">
+                  Transaksi berhasil disimpan di perangkat ini
+                  dan sedang menunggu sinkronisasi. Transaksi akan
+                  dikirim ke server saat koneksi internet kembali.
+                </p>
+                <p className="mt-2 font-medium">
+                  Status: Menunggu sinkronisasi
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 size={44} className="text-green-600" />
+
+              <p className="text-lg font-semibold text-neutral-900">
+                Transaksi Berhasil
+              </p>
+
+              <p className="text-sm text-neutral-600">
+                Total {formatCurrency(total)}
+              </p>
+
+              {paymentMethod === 'cash' && (
+                <p className="text-sm text-neutral-600">
+                  Kembalian: {formatCurrency(result.change)}
+                </p>
+              )}
+            </>
           )}
         </div>
-        <Button onClick={handleFinish}>Transaksi Baru</Button>
+
+        <Button onClick={handleFinish}>
+          Transaksi Baru
+        </Button>
       </div>
     );
   }
@@ -97,31 +175,45 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
     <div className="fixed inset-0 z-40 flex flex-col bg-white p-4 pb-24">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">Pembayaran</h2>
-        <button type="button" onClick={onClose} disabled={createTransaction.isPending}>
+
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={createTransaction.isPending}
+          aria-label="Tutup pembayaran"
+        >
           <X size={20} />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="mb-4 flex items-center justify-between rounded-md border border-neutral-200 p-3">
-          <span className="text-sm text-neutral-500">Total Belanja</span>
-          <span className="text-lg font-semibold">{formatCurrency(total)}</span>
+          <span className="text-sm text-neutral-500">
+            Total Belanja
+          </span>
+          <span className="text-lg font-semibold">
+            {formatCurrency(total)}
+          </span>
         </div>
 
-        <p className="mb-2 text-sm font-medium text-neutral-700">Metode Pembayaran</p>
+        <p className="mb-2 text-sm font-medium text-neutral-700">
+          Metode Pembayaran
+        </p>
+
         <div className="mb-4 flex gap-2">
-          {methods.map((m) => (
+          {methods.map((method) => (
             <button
-              key={m.value}
+              key={method.value}
               type="button"
-              onClick={() => setPaymentMethod(m.value)}
+              disabled={createTransaction.isPending}
+              onClick={() => setPaymentMethod(method.value)}
               className={`flex-1 rounded-md border py-2 text-sm font-medium ${
-                paymentMethod === m.value
+                paymentMethod === method.value
                   ? 'border-accent-600 bg-accent-50 text-accent-700'
                   : 'border-neutral-300 text-neutral-600'
               }`}
             >
-              {m.label}
+              {method.label}
             </button>
           ))}
         </div>
@@ -134,13 +226,20 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
               type="number"
               min={0}
               value={amountReceived}
-              onChange={(e) => setAmountReceived(Number(e.target.value))}
+              onChange={(e) =>
+                setAmountReceived(Number(e.target.value))
+              }
             />
+
             <div className="flex items-center justify-between rounded-md border border-neutral-200 p-3">
-              <span className="text-sm text-neutral-500">Kembalian</span>
+              <span className="text-sm text-neutral-500">
+                Kembalian
+              </span>
               <span
                 className={`text-lg font-semibold ${
-                  change < 0 ? 'text-danger-600' : 'text-neutral-900'
+                  change < 0
+                    ? 'text-danger-600'
+                    : 'text-neutral-900'
                 }`}
               >
                 {formatCurrency(Math.max(change, 0))}
@@ -149,13 +248,41 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
           </div>
         )}
 
-        {formError && <p className="text-danger-600 mt-2 text-sm">{formError}</p>}
+        {offlineSubmitting && (
+          <div
+            className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-2 font-semibold">
+              <WifiOff size={18} />
+              Koneksi internet terputus
+            </div>
+            <p className="mt-1">
+              Sedang menyimpan transaksi ke antrean lokal
+              perangkat. Transaksi belum dikirim ke server.
+            </p>
+          </div>
+        )}
+
+        {formError && (
+          <p className="mt-2 text-sm text-danger-600">
+            {formError}
+          </p>
+        )}
+
         {createTransaction.error && (
-          <p className="text-danger-600 mt-2 text-sm">{createTransaction.error.message}</p>
+          <p className="mt-2 text-sm text-danger-600">
+            {createTransaction.error.message}
+          </p>
         )}
       </div>
 
-      <Button onClick={handleConfirm} isLoading={createTransaction.isPending} className="mt-4">
+      <Button
+        onClick={handleConfirm}
+        isLoading={createTransaction.isPending}
+        className="mt-4"
+      >
         Konfirmasi Pembayaran
       </Button>
     </div>

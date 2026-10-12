@@ -10,8 +10,24 @@
  * Keamanan sesungguhnya terhadap PIN pendek tetap bertumpu pada
  * rate limiting & lockout (lihat check_login_lockout RPC).
  */
-const PIN_PADDING_SUFFIX = '-bm';
+import 'server-only';
 
-export function padPin(pin: string): string {
-  return `${pin}${PIN_PADDING_SUFFIX}`;
+import { createHmac } from 'crypto';
+
+function getPinPepper(): string {
+  const pepper = process.env.PIN_PEPPER;
+
+  if (!pepper) {
+    throw new Error('PIN_PEPPER belum dikonfigurasi.');
+  }
+
+  return pepper;
+}
+
+export function padPin(phoneNumber: string, pin: string): string {
+  const normalizedPhone = phoneNumber.replace(/\D/g, '');
+
+  return createHmac('sha256', getPinPepper())
+    .update(`${normalizedPhone}:${pin}`)
+    .digest('hex');
 }

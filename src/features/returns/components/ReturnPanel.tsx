@@ -42,23 +42,59 @@ export function ReturnPanel({
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
+  const maxRefundForQty = Math.max(0, qty * priceSnapshot);
+
   useEffect(() => {
     setRefundAmount(priceSnapshot * qty);
   }, [qty, priceSnapshot]);
 
-  function handleSubmit() {
-    setFormError(null);
+function handleSubmit() {
+  setFormError(null);
 
-    if (qty <= 0 || qty > remaining)
-      return setFormError(`Qty retur harus antara 1 dan ${remaining}.`);
-    if (reason.trim().length < 3) return setFormError('Alasan retur minimal 3 karakter.');
-    if (refundAmount < 0) return setFormError('Jumlah refund tidak boleh negatif.');
-
-    processReturn.mutate(
-      { transactionItemId, serviceItemId, qtyReturned: qty, reason, refundAmount, restock },
-      { onSuccess: () => setDone(true) }
-    );
+  if (loadingReturned) {
+    setFormError('Tunggu sampai data retur selesai dimuat.');
+    return;
   }
+
+  if (qty <= 0 || qty > remaining || !Number.isInteger(qty)) {
+    setFormError(`Qty retur harus antara 1 dan ${remaining}.`);
+    return;
+  }
+
+  if (reason.trim().length < 3) {
+    setFormError('Alasan retur minimal 3 karakter.');
+    return;
+  }
+
+  if (!Number.isFinite(refundAmount) || refundAmount < 0) {
+    setFormError('Jumlah refund tidak boleh kosong atau negatif.');
+    return;
+  }
+
+  if (refundAmount > maxRefundForQty) {
+    setFormError(
+      `Refund melebihi batas. Maksimal untuk ${qty} unit adalah ${formatCurrency(maxRefundForQty)}.`,
+    );
+    return;
+  }
+
+  processReturn.mutate(
+    {
+      transactionItemId,
+      serviceItemId,
+      qtyReturned: qty,
+      reason: reason.trim(),
+      refundAmount,
+      restock: itemType === 'product' && restock,
+    },
+    {
+      onSuccess: () => {
+        setDone(true);
+      },
+    },
+  );
+}
+
 
   if (done) {
     return (
@@ -112,12 +148,18 @@ export function ReturnPanel({
             />
 
             <Input
-              label="Jumlah Refund"
-              type="number"
-              min={0}
-              value={refundAmount}
-              onChange={(e) => setRefundAmount(Number(e.target.value))}
-            />
+  label="Jumlah Refund"
+  type="number"
+  min={0}
+  max={maxRefundForQty}
+  value={refundAmount}
+  onChange={(e) => setRefundAmount(Number(e.target.value))}
+/>
+
+<p className="text-xs text-neutral-500">
+  Maksimal untuk {qty} unit: {formatCurrency(maxRefundForQty)}.
+  Batas akhir tetap diperiksa server berdasarkan retur sebelumnya.
+</p>
 
             {itemType === 'product' && (
               <label className="flex items-center gap-2 text-sm text-neutral-700">
@@ -145,9 +187,14 @@ export function ReturnPanel({
       </div>
 
       {remaining > 0 && (
-        <Button className="mt-4" isLoading={processReturn.isPending} onClick={handleSubmit}>
-          Proses Retur
-        </Button>
+        <Button
+  className="mt-4"
+  isLoading={processReturn.isPending}
+  disabled={loadingReturned || processReturn.isPending}
+  onClick={handleSubmit}
+>
+  Proses Retur
+</Button>
       )}
     </div>
   );
