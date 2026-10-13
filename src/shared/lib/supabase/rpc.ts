@@ -3,7 +3,7 @@ import { ok, fail, type Result } from '@/shared/types/result';
 import { logger } from '@/shared/lib/logger';
 
 const SENSITIVE_ARG_KEY =
-  /phone|pin|password|token|secret|credential|authorization/i;
+  /phone|pin|password|token|secret|credential|authorization|ip_hash/i;
 
 const SAFE_RPC_MESSAGES = new Set([
   'Akses ditolak.',
