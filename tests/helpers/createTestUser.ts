@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import { supabaseAdmin, createAnonClient } from './supabaseTestClients';
 
 type RoleCode = 'owner' | 'admin' | 'kasir' | 'mekanik' | 'super_admin';
@@ -8,10 +9,10 @@ interface TestUserOptions {
 }
 
 export async function createTestUser({ roleCode, name = 'Test User' }: TestUserOptions) {
-  // Tambah suffix acak — Date.now() saja berisiko bentrok kalau
-  // beberapa test file kebetulan jalan di detik yang sama.
-  const phoneNumber = `0000${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const pin = '1234';
+  // Gunakan nomor 15 digit yang valid untuk skema login dan PIN acak
+  // agar kredensial tes tidak selalu memakai PIN yang mudah ditebak.
+  const phoneNumber = `08${Date.now().toString().slice(-7)}${randomInt(0, 1_000_000).toString().padStart(6, '0')}`;
+  const pin = randomInt(1000, 10_000).toString();
   const email = `${phoneNumber}@budimotor.internal`;
   const password = `${pin}-bm`;
 
@@ -49,6 +50,7 @@ export async function createTestUser({ roleCode, name = 'Test User' }: TestUserO
 
   return {
     userId: authUser.user.id,
+    phoneNumber,
     client,
     async cleanup() {
       await supabaseAdmin.from('users').delete().eq('id', authUser.user.id);

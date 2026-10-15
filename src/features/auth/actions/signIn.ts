@@ -1,5 +1,6 @@
 'use server';
 
+import { randomUUID } from 'node:crypto';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/shared/lib/supabase/server';
 import { createServiceRoleClient } from '@/shared/lib/supabase/serviceRole';
@@ -7,18 +8,52 @@ import { loginSchema } from '../validation/loginSchema';
 import { phoneToInternalEmail } from '../lib/mapPhoneToEmail';
 import { padPin } from '../lib/padPin';
 import { padLegacyPin } from '../lib/padLegacyPin';
-import {
-  checkLoginLockout,
-  recordFailedLogin,
-  resetLoginAttempts,
-} from '../api/authRpc';
+import { beginLoginAttempt, finishLoginAttempt } from '../api/authRpc';
 import { logger } from '@/shared/lib/logger';
 
 type SignInResult = {
   error: string;
 };
 
+const GENERIC_LOGIN_ERROR = 'Nomor HP atau PIN salah, atau login sedang dibatasi. Coba lagi nanti.';
+
 export async function signIn(formData: FormData): Promise<SignInResult> {
+  let serviceClient: ReturnType<typeof createServiceRoleClient> | null = null;
+  let activeAttempt: { phoneNumber: string; attemptId: string } | null = null;
+
+  const finalizeAttempt = async (
+    outcome: 'success' | 'invalid_credentials' | 'aborted'
+  ): Promise<boolean> => {
+    const pending = activeAttempt;
+    if (!pending || !serviceClient) return false;
+
+    // Jika respons jaringan gagal, reservasi database akan kedaluwarsa otomatis.
+    activeAttempt = null;
+    const result = await finishLoginAttempt(
+      serviceClient,
+      pending.phoneNumber,
+      pending.attemptId,
+      outcome
+    );
+
+    if (!result.success) {
+      logger.error('Gagal menyelesaikan reservasi login', {
+        errorCode: result.error.code,
+        outcome,
+      });
+      return false;
+    }
+
+    if (!result.data[0]?.applied) {
+      logger.error('Reservasi login sudah tidak berlaku saat diselesaikan', {
+        outcome,
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   try {
     // ============================================================
     // 1. VALIDASI INPUT
@@ -42,7 +77,8 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
     // ============================================================
 
     const supabase = await createClient();
-    const serviceClient = createServiceRoleClient();
+    serviceClient = createServiceRoleClient();
+    const adminClient = serviceClient;
 
     // ============================================================
     // 3. AMBIL PROFIL USER
@@ -51,12 +87,11 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
     // user berhasil login.
     // ============================================================
 
-    const { data: userProfile, error: userProfileError } =
-      await serviceClient
-        .from('users')
-        .select('id, pin_version, status')
-        .eq('phone_number', phoneNumber)
-        .maybeSingle();
+    const { data: userProfile, error: userProfileError } = await adminClient
+      .from('users')
+      .select('id, pin_version, status')
+      .eq('phone_number', phoneNumber)
+      .maybeSingle();
 
     if (userProfileError) {
       logger.error('Gagal mengambil profil user saat login', {
@@ -71,43 +106,42 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
     // Jangan membocorkan apakah nomor HP terdaftar.
     if (!userProfile || userProfile.status !== 'active') {
       return {
-        error: 'Nomor HP atau PIN salah.',
+        error: GENERIC_LOGIN_ERROR,
       };
     }
 
     // ============================================================
-    // 4. CEK LOCKOUT
+    // 4. RESERVASI LOGIN ATOMIK
+    //
+    // RPC mengunci baris user dan membuat reservasi bertoken. Permintaan
+    // login paralel untuk akun yang sama ditolak sementara sehingga tidak
+    // semuanya lolos sebelum kegagalan pertama tercatat.
     // ============================================================
 
-    const lockoutResult = await checkLoginLockout(
-      serviceClient,
-      phoneNumber
-    );
+    const attemptId = randomUUID();
+    const beginResult = await beginLoginAttempt(adminClient, phoneNumber, attemptId);
 
-    if (!lockoutResult.success) {
-      logger.error('Gagal memeriksa lockout login', {
-        error: lockoutResult.error,
+    if (!beginResult.success) {
+      logger.error('Gagal memulai reservasi login', {
+        errorCode: beginResult.error.code,
       });
-
-      return {
-        error: 'Terjadi kesalahan sistem. Coba lagi.',
-      };
+      return { error: 'Terjadi kesalahan sistem. Coba lagi.' };
     }
 
-    const lockout = lockoutResult.data[0];
+    const attempt = beginResult.data[0];
 
-    if (lockout?.is_locked && lockout.locked_until) {
-      const until = new Date(
-        lockout.locked_until
-      ).toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-
-      return {
-        error: `Akun terkunci sementara. Coba lagi setelah pukul ${until}.`,
-      };
+    if (!attempt) {
+      logger.error('RPC reservasi login tidak mengembalikan status');
+      return { error: 'Terjadi kesalahan sistem. Coba lagi.' };
     }
+
+    // Gunakan respons generik untuk lockout, reservasi yang sedang dipakai,
+    // dan PIN salah agar status akun tidak mudah ditebak melalui pesan error.
+    if (!attempt.can_proceed) {
+      return { error: GENERIC_LOGIN_ERROR };
+    }
+
+    activeAttempt = { phoneNumber, attemptId };
 
     // ============================================================
     // 5. LOGIN
@@ -178,33 +212,24 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
 
     if (error) {
       if (error.status === 400 && error.code === 'invalid_credentials') {
-        const recordResult = await recordFailedLogin(
-          serviceClient,
-          phoneNumber
-        );
-
-        if (!recordResult.success) {
-          logger.error('Gagal mencatat percobaan login gagal', {
-            error: recordResult.error,
-          });
-        }
+        await finalizeAttempt('invalid_credentials');
 
         return {
-          error: 'Nomor HP atau PIN salah.',
+          error: GENERIC_LOGIN_ERROR,
         };
       }
 
       if (error.status === 429) {
+        await finalizeAttempt('aborted');
         return {
-          error:
-            'Terlalu banyak percobaan login. Silakan coba lagi nanti.',
+          error: 'Terlalu banyak percobaan login. Silakan coba lagi nanti.',
         };
       }
 
+      await finalizeAttempt('aborted');
       logger.error('Supabase Auth gagal saat login', {
         status: error.status,
         code: error.code,
-        message: error.message,
       });
 
       return {
@@ -217,9 +242,8 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
     // ============================================================
 
     if (!data.session || !data.user) {
-      logger.error(
-        'Login berhasil tetapi session/user tidak tersedia'
-      );
+      await finalizeAttempt('aborted');
+      logger.error('Login berhasil tetapi session/user tidak tersedia');
 
       return {
         error: 'Terjadi kesalahan sistem. Coba lagi.',
@@ -247,30 +271,26 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
       if (usingLegacyPassword) {
         const newPassword = padPin(phoneNumber, pin);
 
-        const { error: migrationError } =
-          await serviceClient.auth.admin.updateUserById(
-            data.user.id,
-            {
-              password: newPassword,
-            }
-          );
+        const { error: migrationError } = await adminClient.auth.admin.updateUserById(
+          data.user.id,
+          {
+            password: newPassword,
+          }
+        );
 
         if (migrationError) {
-          logger.error(
-            'Login berhasil tetapi migrasi password legacy ke HMAC gagal',
-            {
-              error: migrationError,
-              userId: data.user.id,
-            }
-          );
+          logger.error('Login berhasil tetapi migrasi password legacy ke HMAC gagal', {
+            error: migrationError,
+            userId: data.user.id,
+          });
 
           // Jangan biarkan user terus menggunakan password legacy.
           // Session yang baru dibuat juga dicabut.
           await supabase.auth.signOut();
+          await finalizeAttempt('aborted');
 
           return {
-            error:
-              'Keamanan akun belum berhasil diperbarui. Silakan coba login kembali.',
+            error: 'Keamanan akun belum berhasil diperbarui. Silakan coba login kembali.',
           };
         }
       }
@@ -279,7 +299,7 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
       // 9B. Tandai user sebagai HMAC version 2
       // ----------------------------------------------------------
 
-      const { error: versionError } = await serviceClient
+      const { error: versionError } = await adminClient
         .from('users')
         .update({
           pin_version: 2,
@@ -288,13 +308,10 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
         .eq('pin_version', 1);
 
       if (versionError) {
-        logger.error(
-          'Password sudah menggunakan HMAC tetapi pin_version gagal diperbarui',
-          {
-            error: versionError,
-            userId: data.user.id,
-          }
-        );
+        logger.error('Password sudah menggunakan HMAC tetapi pin_version gagal diperbarui', {
+          error: versionError,
+          userId: data.user.id,
+        });
 
         // Password Auth sudah HMAC.
         // Karena status DB belum berubah, fallback HMAC pada login
@@ -303,10 +320,10 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
         // Namun kita tidak meneruskan login kali ini agar status
         // keamanan dapat diperbaiki terlebih dahulu.
         await supabase.auth.signOut();
+        await finalizeAttempt('aborted');
 
         return {
-          error:
-            'Keamanan akun sedang diperbarui. Silakan login kembali.',
+          error: 'Keamanan akun sedang diperbarui. Silakan login kembali.',
         };
       }
 
@@ -315,29 +332,26 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
       });
     }
 
-    // ============================================================
-    // 10. RESET COUNTER LOGIN
+    // 10. SELESAIKAN RESERVASI LOGIN BERHASIL
+    //
+    // Counter kegagalan dan last_login_at diperbarui atomik di RPC.
+    // Jika finalisasi tidak terkonfirmasi, jangan pertahankan session.
     // ============================================================
 
-    const resetResult = await resetLoginAttempts(
-      serviceClient,
-      phoneNumber
-    );
+    const attemptFinalized = await finalizeAttempt('success');
 
-    if (!resetResult.success) {
-      logger.error('Gagal mereset login attempts setelah login berhasil', {
-        error: resetResult.error,
-        userId: data.user.id,
-      });
+    if (!attemptFinalized) {
+      await supabase.auth.signOut();
+      return {
+        error: 'Login belum dapat diverifikasi. Silakan coba lagi.',
+      };
     }
 
     // ============================================================
     // 11. REDIRECT BERDASARKAN ROLE
     // ============================================================
 
-    const roleCode = data.session.user.app_metadata?.role_code as
-      | string
-      | undefined;
+    const roleCode = data.session.user.app_metadata?.role_code as string | undefined;
 
     if (roleCode === 'kasir') {
       redirect('/pos');
@@ -353,16 +367,14 @@ export async function signIn(formData: FormData): Promise<SignInResult> {
     // 12. JANGAN TELAN REDIRECT NEXT.JS
     // ============================================================
 
-    if (
-      err &&
-      typeof err === 'object' &&
-      'digest' in err
-    ) {
+    if (err && typeof err === 'object' && 'digest' in err) {
       throw err;
     }
 
+    await finalizeAttempt('aborted');
+
     logger.error('Exception tak terduga di signIn', {
-      error: err instanceof Error ? err.message : String(err),
+      errorName: err instanceof Error ? err.name : 'UnknownError',
     });
 
     return {

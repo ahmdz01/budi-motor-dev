@@ -8,7 +8,7 @@
  * Suffix ini BUKAN lapisan keamanan tambahan (nilainya sama untuk
  * semua pengguna) — murni memenuhi syarat teknis platform.
  * Keamanan sesungguhnya terhadap PIN pendek tetap bertumpu pada
- * rate limiting & lockout (lihat check_login_lockout RPC).
+ * rate limiting & reservasi login atomik (lihat begin_login_attempt RPC).
  */
 import 'server-only';
 
@@ -27,7 +27,5 @@ function getPinPepper(): string {
 export function padPin(phoneNumber: string, pin: string): string {
   const normalizedPhone = phoneNumber.replace(/\D/g, '');
 
-  return createHmac('sha256', getPinPepper())
-    .update(`${normalizedPhone}:${pin}`)
-    .digest('hex');
+  return createHmac('sha256', getPinPepper()).update(`${normalizedPhone}:${pin}`).digest('hex');
 }
