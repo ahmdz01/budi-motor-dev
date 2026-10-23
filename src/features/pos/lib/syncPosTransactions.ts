@@ -8,7 +8,7 @@ import {
   updateActionStatus,
 } from '@/shared/lib/offline/queue';
 import { createClient } from '@/shared/lib/supabase/client';
-import { callRpc } from '@/shared/lib/supabase/rpc';
+import { callIdempotentRpc } from '@/shared/lib/supabase/rpc';
 
 import type { PendingAction } from '@/shared/lib/offline/db';
 import type { PosTransactionParamsPayload } from '../hooks/useCreatePosTransaction';
@@ -196,17 +196,17 @@ for (const candidate of eligibleActions) {
         p_amount_received: storedPayload.p_amount_received,
       };
 
-      const result = await callRpc<
-        RpcCreatePosTransactionParams,
-        RpcCreatePosTransactionResult[]
-      >(
-        supabase,
-        'sp_create_pos_transaction',
-        {
-          ...payload,
-          p_client_uuid: action.clientUuid,
-        },
-      );
+      const result = await callIdempotentRpc<
+  RpcCreatePosTransactionParams,
+  RpcCreatePosTransactionResult[]
+>(
+  supabase,
+  'sp_create_pos_transaction',
+  {
+    ...payload,
+    p_client_uuid: action.clientUuid,
+  },
+);
 
       if (!result.success) {
         const retryable = isRetryableSyncError(result.error);

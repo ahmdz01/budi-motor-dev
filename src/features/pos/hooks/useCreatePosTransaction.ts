@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,11 +6,14 @@ import { enqueueOfflineAction } from '@/shared/lib/offline/queue';
 import { generateClientUuid } from '@/shared/lib/offline/clientUuid';
 import { logger } from '@/shared/lib/logger';
 import { createClient } from '@/shared/lib/supabase/client';
-import { callRpc } from '@/shared/lib/supabase/rpc';
+import { callIdempotentRpc } from '@/shared/lib/supabase/rpc';
+import { createAbortTimeout } from '@/shared/lib/abortTimeout';
 
 import type { CartItem, CustomerTypeUsed } from '../stores/useCartStore';
 
 export type PaymentMethod = 'cash' | 'qris' | 'transfer';
+
+const RPC_TIMEOUT_MS = 15_000;
 
 interface CreatePosTransactionInput {
   customerId: string | null;
@@ -22,7 +24,7 @@ interface CreatePosTransactionInput {
 
   /**
    * UUID stabil dari sesi checkout.
-   * Jika tidak diberikan, UUID dibuat untuk percobaan mutasi ini.
+   * Retry harus menggunakan UUID yang sama.
    */
   clientUuid?: string;
 }
@@ -38,9 +40,10 @@ export type PosTransactionParamsPayload = {
   p_amount_received: number | null;
 };
 
-type RpcCreatePosTransactionParams = PosTransactionParamsPayload & {
-  p_client_uuid: string;
-};
+type RpcCreatePosTransactionParams =
+  PosTransactionParamsPayload & {
+    p_client_uuid: string;
+  };
 
 interface RpcCreatePosTransactionResult {
   transaction_id: string;
@@ -62,11 +65,18 @@ interface RpcErrorLike {
 }
 
 /**
- * Mendeteksi kegagalan jaringan tanpa hanya bergantung pada kata
- * "fetch", yang tidak mencakup pesan seperti "Load failed".
+ * Mendeteksi kegagalan jaringan.
+ *
+ * Error RPC yang sudah disamarkan menjadi RPC_ERROR dianggap
+ * ambigu: server mungkin tidak mengirimkan respons yang jelas.
+ * Untuk kasus ini, transaksi dapat dimasukkan ke antrean dengan
+ * UUID yang sama agar aman saat sinkronisasi ulang.
  */
 function isOfflineFailure(err: unknown): boolean {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  if (
+    typeof navigator !== 'undefined' &&
+    !navigator.onLine
+  ) {
     return true;
   }
 
@@ -85,28 +95,37 @@ function isOfflineFailure(err: unknown): boolean {
   }
 
   const rpcError = err as RpcErrorLike;
+
   const status =
     typeof rpcError.status === 'number'
       ? rpcError.status
       : null;
+
   const code =
     typeof rpcError.code === 'string'
       ? rpcError.code.trim()
       : '';
+
   const message =
     typeof rpcError.message === 'string'
       ? rpcError.message
       : '';
 
-  // Supabase dapat mengembalikan status 0 saat tidak ada respons HTTP.
+  // Tidak ada respons HTTP.
   if (status === 0) {
     return true;
   }
 
-  // Kode Postgres/PostgREST atau status HTTP biasanya menunjukkan
+  // Error dengan status HTTP dan kode biasanya merupakan
   // error aplikasi/server, bukan otomatis kegagalan jaringan.
   if (status !== null && status > 0 && code.length > 0) {
     return false;
+  }
+
+  // callRpc menggunakan kode ini ketika error tidak memiliki
+  // kode Supabase/PostgreSQL yang tersedia.
+  if (code === 'RPC_ERROR') {
+    return true;
   }
 
   if (
@@ -117,16 +136,17 @@ function isOfflineFailure(err: unknown): boolean {
     return true;
   }
 
-  // Respons error tanpa kode/status bisa terjadi ketika koneksi putus
-  // sebelum respons Supabase diterima.
+  // Respons tanpa kode/status bisa menandakan koneksi gagal
+  // sebelum respons server diterima.
   return code.length === 0 && status === null;
 }
 
 /**
- * Menyimpan transaksi ke antrean dengan UUID yang sama seperti
- * percobaan online, sehingga retry tidak menjadi transaksi baru.
+ * Menyimpan transaksi ke antrean lokal.
+ *
+ * UUID harus sama dengan UUID pada percobaan online agar
+ * sinkronisasi tidak membuat transaksi baru secara tidak sengaja.
  */
-
 async function queueTransaction(
   payload: PosTransactionParamsPayload,
   items: CartItem[],
@@ -150,7 +170,8 @@ async function queueTransaction(
       };
     }),
     totalAmount: items.reduce(
-      (sum, item) => sum + item.priceSnapshot * item.qty,
+      (sum, item) =>
+        sum + item.priceSnapshot * item.qty,
       0,
     ),
   };
@@ -170,6 +191,7 @@ async function queueTransaction(
   });
 
   const totalAmount = localDisplay.totalAmount;
+
   const changeAmount =
     (payload.p_amount_received ?? totalAmount) - totalAmount;
 
@@ -199,32 +221,52 @@ export function useCreatePosTransaction() {
         p_amount_received: input.amountReceived,
       };
 
-      // Buat atau gunakan UUID yang diberikan oleh sesi checkout.
-      // UUID ini tidak diganti saat transaksi masuk ke antrean offline.
-      const clientUuid = input.clientUuid ?? generateClientUuid();
+      // Gunakan UUID sesi checkout yang sudah tersedia.
+      // UUID ini tidak boleh berganti saat retry atau antrean offline.
+      const clientUuid =
+        input.clientUuid ?? generateClientUuid();
 
+      // Jika sudah offline, simpan ke antrean tanpa menunggu timeout.
       if (
         typeof navigator !== 'undefined' &&
         !navigator.onLine
       ) {
-        return queueTransaction(payload, input.items, clientUuid);
+        return queueTransaction(
+          payload,
+          input.items,
+          clientUuid,
+        );
       }
 
       const supabase = createClient();
 
+      const timeout = createAbortTimeout(RPC_TIMEOUT_MS);
+      const { controller } = timeout;
+
       try {
-        const result = await callRpc<
+        const result = await callIdempotentRpc<
           RpcCreatePosTransactionParams,
           RpcCreatePosTransactionResult[]
-        >(supabase, 'sp_create_pos_transaction', {
-          ...payload,
-          p_client_uuid: clientUuid,
-        });
+        >(
+          supabase,
+          'sp_create_pos_transaction',
+          {
+            ...payload,
+            p_client_uuid: clientUuid,
+          },
+          {
+            signal: controller.signal,
+          },
+        );
 
         if (!result.success) {
-          // Periksa objek error asli sebelum mengubahnya menjadi Error
-          // biasa, agar kode/status Supabase tetap tersedia.
-          if (isOfflineFailure(result.error)) {
+          // Request bisa saja sudah diproses server sebelum
+          // timeout atau gangguan jaringan terjadi. Simpan
+          // ke antrean dengan UUID yang sama untuk rekonsiliasi.
+          if (
+            controller.signal.aborted ||
+            isOfflineFailure(result.error)
+          ) {
             return queueTransaction(
               payload,
               input.items,
@@ -232,10 +274,18 @@ export function useCreatePosTransaction() {
             );
           }
 
+          // Error bisnis seperti stok tidak cukup atau akses
+          // ditolak tidak boleh otomatis dimasukkan ke antrean.
           throw new Error(result.error.message);
         }
 
         const row = result.data[0];
+
+        if (!row) {
+          throw new Error(
+            'Server tidak mengembalikan hasil transaksi yang valid.',
+          );
+        }
 
         return {
           transaction_id: row.transaction_id,
@@ -244,7 +294,10 @@ export function useCreatePosTransaction() {
           is_queued: false,
         };
       } catch (err) {
-        if (isOfflineFailure(err)) {
+        if (
+          controller.signal.aborted ||
+          isOfflineFailure(err)
+        ) {
           return queueTransaction(
             payload,
             input.items,
@@ -253,10 +306,14 @@ export function useCreatePosTransaction() {
         }
 
         throw err;
+      } finally {
+        // Selalu bersihkan timer, termasuk saat berhasil atau gagal.
+        timeout.clear();
       }
     },
 
     onSuccess: (result) => {
+      // Data yang baru masuk antrean belum menjadi data server.
       if (result.is_queued) {
         return;
       }

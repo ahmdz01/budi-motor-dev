@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -40,8 +39,8 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [offlineSubmitting, setOfflineSubmitting] = useState(false);
 
-  // Satu UUID untuk seluruh sesi checkout ini.
-  // UUID tidak berubah hanya karena kasir mencoba membayar lagi.
+  // Satu UUID untuk seluruh sesi checkout.
+  // UUID tetap sama ketika kasir mencoba kembali pembayaran.
   const [clientUuid] = useState(() => generateClientUuid());
 
   const [result, setResult] = useState<{
@@ -66,7 +65,7 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
     const isOffline =
       typeof navigator !== 'undefined' && !navigator.onLine;
 
-    // Beri tahu kasir saat proses antrean offline dimulai.
+    // Beri tahu kasir ketika penyimpanan offline dimulai.
     setOfflineSubmitting(isOffline);
 
     createTransaction.mutate(
@@ -83,8 +82,8 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
         onSuccess: (data) => {
           setOfflineSubmitting(false);
 
-          // Hasil ini baru diterima setelah penyimpanan
-          // online berhasil atau antrean lokal berhasil disimpan.
+          // Hasil diterima setelah penyimpanan online berhasil
+          // atau antrean lokal berhasil disimpan.
           setResult({
             transactionId: data.transaction_id,
             change: data.change_amount,
@@ -131,13 +130,16 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
 
               <div className="mt-2 w-full rounded-lg border border-amber-300 bg-amber-50 p-4 text-left text-sm text-amber-900">
                 <p className="font-semibold">
-                  Belum tersimpan di server
+                  Status server belum terkonfirmasi
                 </p>
+
                 <p className="mt-1">
-                  Transaksi berhasil disimpan di perangkat ini
-                  dan sedang menunggu sinkronisasi. Transaksi akan
-                  dikirim ke server saat koneksi internet kembali.
+                  Transaksi disimpan di perangkat ini dan menunggu
+                  sinkronisasi. Jika server sudah memproses permintaan
+                  sebelumnya, UUID yang sama digunakan untuk mencegah
+                  transaksi tercatat dua kali.
                 </p>
+
                 <p className="mt-2 font-medium">
                   Status: Menunggu sinkronisasi
                 </p>
@@ -164,9 +166,7 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
           )}
         </div>
 
-        <Button onClick={handleFinish}>
-          Transaksi Baru
-        </Button>
+        <Button onClick={handleFinish}>Transaksi Baru</Button>
       </div>
     );
   }
@@ -191,6 +191,7 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
           <span className="text-sm text-neutral-500">
             Total Belanja
           </span>
+
           <span className="text-lg font-semibold">
             {formatCurrency(total)}
           </span>
@@ -235,6 +236,7 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
               <span className="text-sm text-neutral-500">
                 Kembalian
               </span>
+
               <span
                 className={`text-lg font-semibold ${
                   change < 0
@@ -258,6 +260,7 @@ export function CheckoutPanel({ onClose }: CheckoutPanelProps) {
               <WifiOff size={18} />
               Koneksi internet terputus
             </div>
+
             <p className="mt-1">
               Sedang menyimpan transaksi ke antrean lokal
               perangkat. Transaksi belum dikirim ke server.

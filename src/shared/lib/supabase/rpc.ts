@@ -1,4 +1,5 @@
-﻿import type { SupabaseClient } from '@supabase/supabase-js';
+﻿
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { ok, fail, type Result } from '@/shared/types/result';
 import { logger } from '@/shared/lib/logger';
 
@@ -124,22 +125,46 @@ function safeRpcErrorMessage(
   return 'Permintaan tidak dapat diproses. Periksa data dan coba lagi.';
 }
 
+interface CallRpcOptions {
+  suppressUniqueViolationLog?: boolean;
+  signal?: AbortSignal;
+}
+
 /**
  * Wrapper generik untuk memanggil RPC Supabase.
+ *
+ * AbortSignal memungkinkan pemanggil membatalkan permintaan,
+ * misalnya ketika checkout melampaui batas waktu.
  */
 export async function callRpc<TArgs extends object, TReturn>(
   supabase: SupabaseClient,
   functionName: string,
   args: TArgs,
+  options: CallRpcOptions = {},
 ): Promise<Result<TReturn>> {
-  const { data, error } = await supabase.rpc(functionName, args);
+  const request = supabase.rpc(functionName, args);
+
+  const { data, error } = await (
+    options.signal
+      ? request.abortSignal(options.signal)
+      : request
+  );
 
   if (error) {
-    logger.error(`RPC gagal: ${functionName}`, {
-      functionName,
-      args: redactSensitiveArgs(args),
-      supabaseErrorCode: error.code,
-    });
+    // Konflik UNIQUE yang akan ditangani oleh helper idempotensi
+    // tidak dicatat sebagai error sebelum percobaan ulang.
+    if (
+      !(
+        options.suppressUniqueViolationLog &&
+        error.code === '23505'
+      )
+    ) {
+      logger.error(`RPC gagal: ${functionName}`, {
+        functionName,
+        args: redactSensitiveArgs(args),
+        supabaseErrorCode: error.code,
+      });
+    }
 
     return fail(
       error.code ?? 'RPC_ERROR',
@@ -148,4 +173,53 @@ export async function callRpc<TArgs extends object, TReturn>(
   }
 
   return ok(data as TReturn);
+}
+
+interface IdempotentRpcOptions {
+  signal?: AbortSignal;
+}
+
+/**
+ * Khusus RPC pembuatan data yang menerapkan idempotensi
+ * melalui client_uuid.
+ *
+ * Jika percobaan pertama mendapat konflik UNIQUE (23505),
+ * ulangi sekali dengan nama fungsi, parameter, dan UUID yang sama.
+ */
+export async function callIdempotentRpc<
+  TArgs extends object,
+  TReturn,
+>(
+  supabase: SupabaseClient,
+  functionName: string,
+  args: TArgs,
+  options: IdempotentRpcOptions = {},
+): Promise<Result<TReturn>> {
+  const firstResult = await callRpc<TArgs, TReturn>(
+    supabase,
+    functionName,
+    args,
+    {
+      suppressUniqueViolationLog: true,
+      signal: options.signal,
+    },
+  );
+
+  if (
+    firstResult.success ||
+    firstResult.error.code !== '23505'
+  ) {
+    return firstResult;
+  }
+
+  // Percobaan kedua tetap menggunakan UUID dan parameter
+  // yang sama. Jangan melakukan retry tanpa batas.
+  return callRpc<TArgs, TReturn>(
+    supabase,
+    functionName,
+    args,
+    {
+      signal: options.signal,
+    },
+  );
 }

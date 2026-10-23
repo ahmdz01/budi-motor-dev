@@ -14,10 +14,10 @@ vi.mock('@/shared/lib/supabase/client', () => ({
 }));
 
 vi.mock('@/shared/lib/supabase/rpc', () => ({
-  callRpc: vi.fn(),
+  callIdempotentRpc: vi.fn(),
 }));
 
-import { callRpc } from '@/shared/lib/supabase/rpc';
+import { callIdempotentRpc } from '@/shared/lib/supabase/rpc';
 import {
   enqueueOfflineAction,
   getPendingActions,
@@ -58,7 +58,7 @@ async function addFailedAction(): Promise<string> {
 }
 
 function mockSuccessfulRpc() {
-  vi.mocked(callRpc).mockResolvedValue({
+  vi.mocked(callIdempotentRpc).mockResolvedValue({
     success: true,
     data: [
       {
@@ -93,9 +93,9 @@ describe('syncPosTransactions — retry T2', () => {
 
     expect(result.synced).toBe(1);
     expect(result.failed).toBe(0);
-    expect(callRpc).toHaveBeenCalledTimes(1);
+    expect(callIdempotentRpc).toHaveBeenCalledTimes(1);
 
-    const rpcArgs = vi.mocked(callRpc).mock.calls[0]?.[2];
+    const rpcArgs = vi.mocked(callIdempotentRpc).mock.calls[0]?.[2];
 
     expect(rpcArgs).toMatchObject({
       p_client_uuid: selectedUuid,
@@ -124,7 +124,7 @@ describe('syncPosTransactions — retry T2', () => {
     const result = await syncPosTransactions();
 
     expect(result.synced).toBe(0);
-    expect(callRpc).not.toHaveBeenCalled();
+    expect(callIdempotentRpc).not.toHaveBeenCalled();
 
     const actions = await getPendingActions();
     const saved = actions.find(
@@ -156,7 +156,13 @@ describe('syncPosTransactions — retry T2', () => {
 
     expect(result.synced).toBe(1);
     expect(result.failed).toBe(0);
-    expect(callRpc).toHaveBeenCalledTimes(1);
+    expect(callIdempotentRpc).toHaveBeenCalledTimes(1);
+
+    const rpcArgs = vi.mocked(callIdempotentRpc).mock.calls[0]?.[2];
+
+expect(rpcArgs).toMatchObject({
+  p_client_uuid: clientUuid,
+});
 
     const remainingActions = await getPendingActions();
 

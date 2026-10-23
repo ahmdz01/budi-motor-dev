@@ -3,12 +3,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/shared/lib/supabase/client';
-import { callRpc } from '@/shared/lib/supabase/rpc';
-import { generateClientUuid } from '@/shared/lib/offline/clientUuid';
+import { callIdempotentRpc } from '@/shared/lib/supabase/rpc';
 import type { PurchaseCartItem } from '../types';
 
 interface CreatePurchaseInput {
   supplierId: string;
+  clientUuid: string;
   purchaseDate: string;
   items: PurchaseCartItem[];
   amountPaid: number;
@@ -23,7 +23,7 @@ export function useCreatePurchase() {
     mutationFn: async (input: CreatePurchaseInput) => {
       const supabase = createClient();
 
-      const result = await callRpc<
+      const result = await callIdempotentRpc<
   {
     p_client_uuid: string;
     p_supplier_id: string;
@@ -43,7 +43,7 @@ export function useCreatePurchase() {
   supabase,
   'sp_record_purchase',
   {
-    p_client_uuid: generateClientUuid(),
+    p_client_uuid: input.clientUuid,
     p_supplier_id: input.supplierId,
     p_purchase_date: input.purchaseDate,
     p_items: input.items.map((item) => ({

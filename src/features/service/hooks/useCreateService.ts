@@ -3,13 +3,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/shared/lib/supabase/client';
-import { callRpc } from '@/shared/lib/supabase/rpc';
-import { generateClientUuid } from '@/shared/lib/offline/clientUuid';
+import { callIdempotentRpc } from '@/shared/lib/supabase/rpc';
 import type { ServiceIntakeFormValues } from '../validation/serviceSchema';
 
 interface CreateServiceInput extends ServiceIntakeFormValues {
   customerId: string;
   vehicleId: string | null;
+  clientUuid: string;
 }
 
 export function useCreateService() {
@@ -20,7 +20,7 @@ export function useCreateService() {
     mutationFn: async (input: CreateServiceInput) => {
       const supabase = createClient();
 
-      const result = await callRpc<
+      const result = await callIdempotentRpc<
         {
           p_client_uuid: string;
           p_customer_id: string;
@@ -31,7 +31,7 @@ export function useCreateService() {
         },
         { service_id: string }[]
       >(supabase, 'sp_create_service', {
-        p_client_uuid: generateClientUuid(),
+        p_client_uuid: input.clientUuid,
         p_customer_id: input.customerId,
         p_vehicle_id: input.vehicleId,
         p_complaint: input.complaint,

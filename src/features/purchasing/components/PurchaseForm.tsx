@@ -11,6 +11,7 @@ import { ProductPicker } from './ProductPicker';
 import { PurchaseItemRow } from './PurchaseItemRow';
 import { useCreatePurchase } from '../hooks/usePurchaseMutations';
 import type { PurchaseCartItem, PaymentStatus } from '../types';
+import { generateClientUuid } from '@/shared/lib/offline/clientUuid';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -30,6 +31,7 @@ export function PurchaseForm() {
   const { data: suppliers = [] } = useSuppliers();
   const createSupplier = useCreateSupplier();
   const createPurchase = useCreatePurchase();
+  const [clientUuid] = useState(() => generateClientUuid());
 
   const [supplierId, setSupplierId] = useState<string | null>(null);
   const [purchaseDate, setPurchaseDate] = useState(todayIso());
@@ -72,6 +74,7 @@ export function PurchaseForm() {
 
     createPurchase.mutate({
       supplierId,
+      clientUuid,
       purchaseDate,
       items,
       amountPaid,

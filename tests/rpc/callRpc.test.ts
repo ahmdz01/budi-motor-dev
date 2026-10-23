@@ -7,7 +7,10 @@ vi.mock('@/shared/lib/logger', () => ({
   },
 }));
 
-import { callRpc } from '@/shared/lib/supabase/rpc';
+import {
+  callIdempotentRpc,
+  callRpc,
+} from '@/shared/lib/supabase/rpc';
 import { logger } from '@/shared/lib/logger';
 
 const rpc = vi.fn();
@@ -138,4 +141,149 @@ it('tetap menampilkan pesan bisnis yang dikenal', async () => {
     },
   });
 });
+
+
+describe('callIdempotentRpc', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('mengulang sekali setelah 23505 dan mempertahankan UUID serta parameter yang sama', async () => {
+    const args = {
+      p_client_uuid: 'stable-client-uuid',
+      p_value: 'test',
+    };
+
+    rpc
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: [{ transaction_id: 'existing-transaction-id' }],
+        error: null,
+      });
+
+    const result = await callIdempotentRpc(
+      supabase,
+      'sp_create_pos_transaction',
+      args,
+    );
+
+    expect(result).toEqual({
+      success: true,
+      data: [{ transaction_id: 'existing-transaction-id' }],
+    });
+
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenNthCalledWith(
+      1,
+      'sp_create_pos_transaction',
+      args,
+    );
+    expect(rpc).toHaveBeenNthCalledWith(
+      2,
+      'sp_create_pos_transaction',
+      args,
+    );
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('tidak mengulang RPC ketika terjadi error bisnis selain 23505', async () => {
+    rpc.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: '22023',
+        message:
+          'Stok tidak cukup untuk salah satu barang saat transaksi diproses.',
+      },
+    });
+
+    const result = await callIdempotentRpc(
+      supabase,
+      'sp_create_pos_transaction',
+      {
+        p_client_uuid: 'stable-client-uuid',
+        p_items: [],
+      },
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      error: {
+        code: '22023',
+        message:
+          'Stok tidak cukup untuk salah satu barang saat transaksi diproses.',
+      },
+    });
+
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('berhenti setelah percobaan kedua juga gagal dengan 23505', async () => {
+    rpc
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint',
+        },
+      });
+
+    const result = await callIdempotentRpc(
+      supabase,
+      'sp_create_pos_transaction',
+      { p_client_uuid: 'stable-client-uuid' },
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      error: { code: '23505' },
+    });
+
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('callRpc AbortSignal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('meneruskan AbortSignal ke request Supabase', async () => {
+    const controller = new AbortController();
+
+    const abortSignal = vi.fn().mockResolvedValue({
+      data: { accepted: true },
+      error: null,
+    });
+
+    rpc.mockReturnValueOnce({ abortSignal });
+
+    const result = await callRpc(
+      supabase,
+      'example_rpc',
+      { p_id: 'test-id' },
+      { signal: controller.signal },
+    );
+
+    expect(abortSignal).toHaveBeenCalledWith(controller.signal);
+
+    expect(result).toEqual({
+      success: true,
+      data: { accepted: true },
+    });
+  });
+});
+
 });

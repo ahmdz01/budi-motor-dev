@@ -14,6 +14,7 @@ import {
   serviceIntakeFormSchema,
   type ServiceIntakeFormValues,
 } from '../validation/serviceSchema';
+import { generateClientUuid } from '@/shared/lib/offline/clientUuid';
 
 const customerTypeOptions: { value: ServiceIntakeFormValues['customerTypeUsed']; label: string }[] = [
   { value: 'general', label: 'Umum' },
@@ -22,7 +23,7 @@ const customerTypeOptions: { value: ServiceIntakeFormValues['customerTypeUsed'];
 ];
 
 interface ServiceIntakeFormProps {
-  onSubmit: (input: ServiceIntakeFormValues & { customerId: string; vehicleId: string | null }) => void;
+  onSubmit: (input: ServiceIntakeFormValues & { customerId: string; vehicleId: string | null; clientUuid: string; }) => void;
   isSubmitting: boolean;
   submitError?: string | null;
 }
@@ -32,6 +33,7 @@ export function ServiceIntakeForm({ onSubmit, isSubmitting, submitError }: Servi
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const [isAddingVehicle, setIsAddingVehicle] = useState(false);
   const [customerError, setCustomerError] = useState<string | null>(null);
+  const [clientUuid] = useState(() => generateClientUuid());
 
   const { data: vehicles } = useVehicles(customer?.id ?? '');
   const createVehicle = useCreateVehicle(customer?.id ?? '');
@@ -61,7 +63,7 @@ export function ServiceIntakeForm({ onSubmit, isSubmitting, submitError }: Servi
       return;
     }
 
-    onSubmit({ ...data, customerId: customer.id, vehicleId });
+    onSubmit({ ...data, customerId: customer.id, vehicleId, clientUuid, });
   }
 
   return (
