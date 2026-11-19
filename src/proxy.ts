@@ -106,9 +106,11 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL(home, request.url));
     }
 
-    const matchedRoute = Object.keys(RESTRICTED_ROUTES).find(
-      (route) => pathname === route || pathname.startsWith(`${route}/`),
-    );
+    const matchedRoute = Object.keys(RESTRICTED_ROUTES)
+  .filter(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  )
+  .sort((a, b) => b.length - a.length)[0];
 
     const allowedRoles = matchedRoute
       ? RESTRICTED_ROUTES[matchedRoute]

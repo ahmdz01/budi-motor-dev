@@ -31,6 +31,7 @@ export const RESTRICTED_ROUTES: Record<string, RoleCode[]> = {
   '/more': ['owner', 'admin', 'super_admin'],
   '/pos': ['owner', 'admin', 'kasir', 'super_admin'],
   '/service': ['owner', 'admin', 'kasir', 'mekanik', 'super_admin'],
+  '/service/new': ['owner', 'admin', 'kasir', 'super_admin'],
   '/purchases': ['owner', 'admin', 'super_admin'],
   '/stock-opname': ['owner', 'admin', 'super_admin'],
   '/transactions': ['owner', 'admin', 'kasir', 'super_admin'],

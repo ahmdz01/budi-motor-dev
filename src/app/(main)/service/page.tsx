@@ -5,25 +5,36 @@ import Link from 'next/link';
 import { Search, Plus } from 'lucide-react';
 import { ServiceListItem } from '@/features/service/components/ServiceListItem';
 import { useServices } from '@/features/service/hooks/useServices';
+import { useCurrentUser } from '@/shared/contexts/UserContext';
 
 export default function ServicePage() {
   const [search, setSearch] = useState('');
+  const { roleCode } = useCurrentUser();
   const { data: services, isLoading, error } = useServices({ search });
+
+  const canCreateService = [
+    'owner',
+    'admin',
+    'kasir',
+    'super_admin',
+  ].includes(roleCode);
 
   return (
     <div className="flex flex-col gap-4 p-4 pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Servis</h1>
-        <Link href="/service/new">
-          <button
-            type="button"
-            className="bg-accent-600 hover:bg-accent-700 flex items-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-medium text-white"
-          >
-            <Plus size={16} /> Terima Kendaraan
-          </button>
-        </Link>
-      </div>
 
+        {canCreateService && (
+          <Link href="/service/new">
+            <button
+              type="button"
+              className="bg-accent-600 hover:bg-accent-700 flex items-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-medium text-white"
+            >
+              <Plus size={16} /> Terima Kendaraan
+            </button>
+          </Link>
+        )}
+      </div>
       <div className="relative">
         <Search
           size={18}
